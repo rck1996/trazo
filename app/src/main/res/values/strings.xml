@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">Tu día, hábitos y acceso al modo Enfoque</string>
+    <string name="habit_widget_description">Completa tu próximo hábito sin abrir la app</string>
+    <string name="focus_widget_description">Tu temporizador de enfoque y próxima tarea</string>
+    <string name="widget_focus_mode">MODO ENFOQUE</string>
+    <string name="widget_default_time">25:00</string>
+    <string name="widget_one_stroke">Un trazo a la vez</string>
+    <string name="widget_start">▶ Iniciar 25 min</string>
+    <string name="widget_today_ritual">RITUAL DE HOY</string>
+    <string name="widget_habit_progress_preview">0 / 1 hoy</string>
+    <string name="widget_spark">✦</string>
+    <string name="widget_habit_preview">Beber agua</string>
+    <string name="widget_start_streak">Empieza tu racha</string>
+    <string name="widget_complete_habit">Completar hábito</string>
+    <string name="widget_check">✓</string>
+    <string name="task_list_widget_description">Completa tus próximas tres tareas desde la pantalla de inicio</string>
+    <string name="task_list_widget_title">Mis próximos trazos</string>
+    <string name="task_list_widget_progress">3 por trazar</string>
+    <string name="task_list_widget_empty">✓ Todo en calma por ahora</string>
+    <string name="task_list_widget_footer">Ver todas las tareas →</string>
+    <string name="habit_list_widget_description">Marca o desmarca tres rituales sin abrir Trazo</string>
+    <string name="habit_list_widget_title">Jardín de rituales</string>
+    <string name="habit_list_widget_progress">0 / 3 floreciendo</string>
+    <string name="habit_list_widget_empty">Hoy el jardín descansa ✦</string>
+    <string name="habit_list_widget_footer">Abrir mis hábitos →</string>
+    <string name="smart_capture_widget_description">Dicta una tarea o hábito y deja que Trazo lo configure</string>
+    <string name="smart_capture_widget_title">Captura inteligente</string>
+    <string name="smart_capture_widget_example">“Spinning lun · mie · vie”</string>
+    <string name="smart_capture_widget_voice">Dictar y guardar con Trazo</string>
+</resources>

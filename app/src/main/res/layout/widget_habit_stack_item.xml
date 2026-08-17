@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_habit_item"
+    android:layout_width="match_parent"
+    android:layout_height="54dp"
+    android:background="@drawable/widget_habit_note"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="9dp"
+    android:paddingVertical="5dp">
+
+    <ImageView android:id="@+id/widget_habit_item_image" android:layout_width="39dp"
+        android:layout_height="39dp" android:contentDescription="Abrir hábitos"
+        android:scaleType="centerInside" android:src="@drawable/widget_ai_ritual" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_marginStart="8dp" android:layout_weight="1" android:orientation="vertical">
+        <TextView android:id="@+id/widget_habit_item_title" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1"
+            android:textColor="#272522" android:textSize="13sp" android:textStyle="bold" />
+        <TextView android:id="@+id/widget_habit_item_meta" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1"
+            android:textColor="#43866A" android:textSize="9sp" android:textStyle="bold" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_habit_item_check" android:layout_width="36dp"
+        android:layout_height="36dp" android:layout_marginStart="7dp"
+        android:background="@drawable/widget_check" android:contentDescription="Completar hábito"
+        android:gravity="center" android:text="✓" android:textColor="#FFFFFF"
+        android:textSize="18sp" android:textStyle="bold" />
+</LinearLayout>

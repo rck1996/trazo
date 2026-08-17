@@ -313,7 +313,9 @@ private fun AmbientFocusMode(
     onToggle: () -> Unit,
     onClose: () -> Unit
 ) {
-    val ambientProgress = if (phase == FocusPhase.FOCUS) Coral.copy(alpha = .62f) else Leaf.copy(alpha = .62f)
+    val minimalMode = LocalMinimalMode.current
+    val ambientProgress = if (minimalMode) Color.White.copy(alpha = .82f)
+        else if (phase == FocusPhase.FOCUS) Coral.copy(alpha = .62f) else Leaf.copy(alpha = .62f)
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
@@ -349,12 +351,13 @@ private fun AmbientFocusMode(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     if (phase == FocusPhase.FOCUS) "TRAZO EN CALMA" else "PAUSA CONSCIENTE",
-                    color = if (phase == FocusPhase.FOCUS) Coral.copy(alpha = .82f) else Leaf.copy(alpha = .82f),
+                    color = if (minimalMode) Color.White.copy(alpha = .82f)
+                        else if (phase == FocusPhase.FOCUS) Coral.copy(alpha = .82f) else Leaf.copy(alpha = .82f),
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.4.sp,
                     fontSize = 12.sp
                 )
-                AmbientIllustration(phase, running)
+                if (!minimalMode) AmbientIllustration(phase, running) else Spacer(Modifier.height(42.dp))
                 Text(
                     "%02d:%02d".format(remaining / 60, remaining % 60),
                     color = Color(0xFFE5DED1),
@@ -421,6 +424,10 @@ private fun AmbientIllustration(phase: FocusPhase, running: Boolean) {
 
 @Composable
 private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle: String?, running: Boolean) {
+    if (LocalMinimalMode.current) {
+        MinimalTimer(remaining, total, phase, taskTitle, running)
+        return
+    }
     val motionEnabled = !LocalReducedMotion.current && !LocalMinimalMode.current
     val paused = !running && remaining in 1 until total
     val artState = focusArtState(phase, running, remaining, total)
@@ -547,6 +554,59 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
                 Text("%02d:%02d".format(remaining/60,remaining%60), fontSize=46.sp, fontWeight=FontWeight.Black, color=Ink, modifier=Modifier.padding(horizontal = 18.dp, vertical = 2.dp))
             }
             Text(contextMessage, color=MutedInk, fontSize=13.sp, maxLines=2, overflow=TextOverflow.Ellipsis, textAlign=androidx.compose.ui.text.style.TextAlign.Center, modifier=Modifier.width(190.dp).padding(top=4.dp))
+        }
+    }
+}
+
+@Composable
+private fun MinimalTimer(
+    remaining: Int,
+    total: Int,
+    phase: FocusPhase,
+    taskTitle: String?,
+    running: Boolean
+) {
+    val paused = !running && remaining in 1 until total
+    val progress = elapsedTimerProgress(remaining, total)
+    val progressInk = Ink
+    val phaseLabel = when {
+        paused -> "PAUSA"
+        phase == FocusPhase.FOCUS -> "ENFOQUE"
+        else -> "DESCANSO"
+    }
+    val context = when {
+        paused && phase == FocusPhase.FOCUS -> "Tu progreso está guardado"
+        paused -> "Descanso en pausa"
+        phase == FocusPhase.BREAK -> "Respira y descansa"
+        taskTitle != null -> taskTitle
+        running -> "Un trazo a la vez"
+        else -> "Listo para empezar"
+    }
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 36.dp, vertical = 38.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(phaseLabel, color = Ink, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 12.sp)
+        Text(
+            "%02d:%02d".format(remaining / 60, remaining % 60),
+            color = Ink,
+            fontSize = 58.sp,
+            fontWeight = FontWeight.Light,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(top = 18.dp)
+        )
+        Text(
+            context,
+            color = MutedInk,
+            fontSize = 13.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.widthIn(max = 260.dp).padding(top = 8.dp)
+        )
+        Canvas(Modifier.fillMaxWidth().padding(top = 28.dp).height(4.dp)) {
+            drawLine(progressInk.copy(alpha = .14f), Offset(0f, center.y), Offset(size.width, center.y), 2.dp.toPx(), StrokeCap.Square)
+            drawLine(progressInk, Offset(0f, center.y), Offset(size.width * progress, center.y), 2.dp.toPx(), StrokeCap.Square)
         }
     }
 }

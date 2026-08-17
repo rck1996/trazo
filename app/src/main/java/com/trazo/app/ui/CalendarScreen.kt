@@ -65,6 +65,7 @@ internal fun CalendarScreen(
     onAddTask: (LocalDate) -> Unit
 ) {
     var mode by remember { mutableStateOf(CalendarMode.PLANNER) }
+    val reducedMotion = LocalReducedMotion.current
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
 
@@ -88,7 +89,10 @@ internal fun CalendarScreen(
         ModeSelector(mode) { mode = it }
         AnimatedContent(
             targetState = mode,
-            transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(160)) },
+            transitionSpec = {
+                fadeIn(tween(if (reducedMotion) 0 else 260)) togetherWith
+                    fadeOut(tween(if (reducedMotion) 0 else 160))
+            },
             label = "calendar mode"
         ) { currentMode ->
             when (currentMode) {

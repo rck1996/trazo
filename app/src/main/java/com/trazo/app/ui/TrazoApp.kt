@@ -155,6 +155,7 @@ fun TrazoApp(
 ) {
     val context = LocalContext.current
     val reducedMotion = LocalReducedMotion.current
+    val minimalMode = LocalMinimalMode.current
     val hapticsEnabled = LocalTrazoHaptics.current
     val hapticFeedback = LocalHapticFeedback.current
     val toggleTaskWithFeedback: (String) -> Unit = { id ->
@@ -196,7 +197,7 @@ fun TrazoApp(
     }
 
     Box(Modifier.fillMaxSize().background(Paper)) {
-        PaperTexture()
+        if (!minimalMode) PaperTexture()
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbar) },
@@ -211,7 +212,8 @@ fun TrazoApp(
                     containerColor = Coral,
                     contentColor = Color.White,
                     shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.rotate(-2f).semantics { contentDescription = "Crear elemento" }
+                    modifier = Modifier.then(if (minimalMode) Modifier else Modifier.rotate(-2f))
+                        .semantics { contentDescription = "Crear elemento" }
                 ) { Text("＋", fontSize = 28.sp, fontWeight = FontWeight.Light) }
                 }
             }
@@ -332,13 +334,13 @@ private fun PageHeader(
         label = "contextual art breathing"
     )
     Box(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 24.dp, vertical = 16.dp)) {
-        Column(Modifier.padding(end = if (minimalMode && onOpenSettings == null) 0.dp else 72.dp)) {
+        Column(Modifier.padding(end = if (minimalMode) if (onOpenSettings == null) 0.dp else 48.dp else 72.dp)) {
             Text(eyebrow.uppercase(Locale.forLanguageTag("es-CL")), color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
             Text(title, style = MaterialTheme.typography.displaySmall)
             Text(subtitle, color = MutedInk)
         }
         if (!minimalMode || onOpenSettings != null) Box(
-            Modifier.size(78.dp).align(Alignment.TopEnd)
+            Modifier.size(if (minimalMode) 42.dp else 78.dp).align(Alignment.TopEnd)
                 .then(
                     if (onOpenSettings != null) Modifier.clip(CircleShape).clickable(onClick = onOpenSettings)
                         .semantics { contentDescription = "Abrir ajustes" }
@@ -353,10 +355,11 @@ private fun PageHeader(
             )
             if (onOpenSettings != null) {
                 Box(
-                    Modifier.size(29.dp).align(Alignment.BottomEnd).clip(CircleShape)
-                        .background(Coral).border(2.dp, Paper, CircleShape),
+                    Modifier.size(if (minimalMode) 40.dp else 29.dp).align(if (minimalMode) Alignment.TopEnd else Alignment.BottomEnd).clip(CircleShape)
+                        .background(if (minimalMode) Color.Transparent else Coral)
+                        .border(if (minimalMode) 1.dp else 2.dp, if (minimalMode) Ink else Paper, CircleShape),
                     contentAlignment = Alignment.Center
-                ) { Text("⚙", color = Color.White, fontSize = 14.sp) }
+                ) { Text(if (minimalMode) "⋮" else "⚙", color = if (minimalMode) Ink else Color.White, fontSize = if (minimalMode) 22.sp else 14.sp) }
             }
         }
     }
@@ -451,9 +454,10 @@ private fun ReviewCard(
     focusMinutes: Int,
     onOpenPlanner: () -> Unit
 ) {
+    val minimalMode = LocalMinimalMode.current
     Surface(
         color = Mustard.copy(alpha = .14f),
-        shape = RoundedCornerShape(18.dp, 13.dp, 20.dp, 15.dp),
+        shape = if (minimalMode) RoundedCornerShape(12.dp) else RoundedCornerShape(18.dp, 13.dp, 20.dp, 15.dp),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 7.dp).fillMaxWidth()
             .sketchBorder(Ink.copy(alpha = .14f))
     ) {
@@ -678,7 +682,7 @@ private fun SettingsSheet(
                         }
                     }
                     SettingsToggle("Texto más grande", settings.largeText) { viewModel.updateSettings(settings.copy(largeText = it)) }
-                    SettingsToggle("Vista minimalista", settings.minimalMode) { viewModel.updateSettings(settings.copy(minimalMode = it)) }
+                    SettingsToggle("Minimalista blanco y negro", settings.minimalMode) { viewModel.updateSettings(settings.copy(minimalMode = it)) }
                     SettingsToggle("Reducir animaciones", settings.reducedMotion) { viewModel.updateSettings(settings.copy(reducedMotion = it)) }
                     SettingsToggle("Respuesta háptica", settings.haptics) { viewModel.updateSettings(settings.copy(haptics = it)) }
                 }
@@ -744,10 +748,11 @@ private fun LibraryRow(label: String, action: String, onClick: () -> Unit) {
 
 @Composable
 private fun RowScope.QuickAction(symbol: String, label: String, color: Color, onClick: () -> Unit) {
+    val minimalMode = LocalMinimalMode.current
     Surface(
         onClick = onClick,
         color = color,
-        shape = RoundedCornerShape(18.dp, 12.dp, 20.dp, 14.dp),
+        shape = if (minimalMode) RoundedCornerShape(12.dp) else RoundedCornerShape(18.dp, 12.dp, 20.dp, 14.dp),
         modifier = Modifier.weight(1f).sketchBorder(Ink.copy(alpha = .18f))
     ) {
         Column(Modifier.padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -880,13 +885,14 @@ private fun SearchField(value: String, onChange: (String) -> Unit, label: String
 
 @Composable
 private fun HabitSummary(habits: List<Habit>) {
+    val minimalMode = LocalMinimalMode.current
     val today = LocalDate.now()
     val due = habits.filter { HabitProgress.isScheduled(it, today) }
     val done = due.count { HabitProgress.isComplete(it, today) }
     val best = habits.maxOfOrNull { HabitProgress.streak(it, today) } ?: 0
     Surface(
         color = Sky.copy(alpha = .12f),
-        shape = RoundedCornerShape(22.dp, 12.dp, 20.dp, 10.dp),
+        shape = if (minimalMode) RoundedCornerShape(12.dp) else RoundedCornerShape(22.dp, 12.dp, 20.dp, 10.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp).sketchBorder(Sky.copy(alpha = .55f))
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -904,8 +910,10 @@ private fun HabitSummary(habits: List<Habit>) {
 
 @Composable
 private fun ProgressNote(done: Int, total: Int) {
+    val minimalMode = LocalMinimalMode.current
+    val reducedMotion = LocalReducedMotion.current
     val progress = if (total == 0) 0f else done.toFloat() / total
-    val animatedProgress by animateFloatAsState(progress, tween(850), label = "daily progress")
+    val animatedProgress by animateFloatAsState(progress, tween(if (reducedMotion) 0 else 850), label = "daily progress")
     val faintInk = Ink.copy(alpha = .08f)
     val leafColor = Leaf
     val mustardColor = Mustard.copy(alpha = .5f)
@@ -913,8 +921,8 @@ private fun ProgressNote(done: Int, total: Int) {
     val barColor = Coral
     Surface(
         color = PaperRaised,
-        shape = RoundedCornerShape(11.dp, 28.dp, 16.dp, 24.dp),
-        shadowElevation = 3.dp,
+        shape = if (minimalMode) RoundedCornerShape(12.dp) else RoundedCornerShape(11.dp, 28.dp, 16.dp, 24.dp),
+        shadowElevation = if (minimalMode) 0.dp else 3.dp,
         modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().sketchBorder(Mustard.copy(alpha = .78f))
     ) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -964,12 +972,19 @@ private fun TaskCard(
     onDateChange: ((LocalDate?) -> Unit)? = null, onEdit: (() -> Unit)? = null,
     onArchive: (() -> Unit)? = null
 ) {
-    val cardColor by animateColorAsState(if (task.completed) Leaf.copy(alpha = .16f) else PaperRaised, label = "task color")
+    val reducedMotion = LocalReducedMotion.current
+    val minimalMode = LocalMinimalMode.current
+    val cardColor by animateColorAsState(
+        if (task.completed) Leaf.copy(alpha = .16f) else PaperRaised,
+        tween(if (reducedMotion) 0 else 220),
+        label = "task color"
+    )
     Surface(
         color = cardColor,
-        shape = RoundedCornerShape(14.dp, 9.dp, 16.dp, 11.dp),
+        shape = if (minimalMode) RoundedCornerShape(12.dp) else RoundedCornerShape(14.dp, 9.dp, 16.dp, 11.dp),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp).fillMaxWidth()
-            .animateContentSize(spring(stiffness = 420f)).sketchBorder(Ink.copy(alpha = .42f))
+            .then(if (reducedMotion) Modifier else Modifier.animateContentSize(spring(stiffness = 420f)))
+            .sketchBorder(Ink.copy(alpha = .42f))
     ) {
         Column {
             Row(Modifier.fillMaxWidth().clickable { onToggle(task.id) }.padding(start = 8.dp, top = 10.dp, bottom = 8.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1055,6 +1070,7 @@ private fun HabitCard(
     val amount = HabitProgress.amount(habit, today)
     val streak = HabitProgress.streak(habit, today)
     val reducedMotion = LocalReducedMotion.current
+    val minimalMode = LocalMinimalMode.current
     val cardColor by animateColorAsState(
         if (checked) Sky.copy(alpha = .24f) else PaperRaised,
         tween(if (reducedMotion) 0 else 320),
@@ -1062,13 +1078,17 @@ private fun HabitCard(
     )
     Surface(
         color = cardColor,
-        shape = RoundedCornerShape(18.dp, 10.dp, 16.dp, 8.dp),
+        shape = if (minimalMode) RoundedCornerShape(12.dp) else RoundedCornerShape(18.dp, 10.dp, 16.dp, 8.dp),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp).fillMaxWidth().sketchBorder(Sky)
     ) {
         Column {
             Row(Modifier.fillMaxWidth().clickable(enabled = HabitProgress.isScheduled(habit, today)) { onToggle(habit.id) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(46.dp).clip(CircleShape).background(Mustard.copy(alpha = .28f)), contentAlignment = Alignment.Center) {
-                    Text(habit.emoji, fontSize = 22.sp)
+                Box(
+                    Modifier.size(46.dp).clip(CircleShape)
+                        .background(if (minimalMode) Color.Transparent else Mustard.copy(alpha = .28f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(if (minimalMode) "○" else habit.emoji, color = Ink, fontSize = if (minimalMode) 18.sp else 22.sp)
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text(habit.title, fontWeight = FontWeight.Bold, maxLines = 3)
@@ -1147,13 +1167,14 @@ private fun SketchCheck(checked: Boolean, onClick: () -> Unit) {
     val checkColor = Leaf
     val emptyColor = Ink.copy(alpha = .45f)
     val reducedMotion = LocalReducedMotion.current
+    val minimalMode = LocalMinimalMode.current
     val reveal by animateFloatAsState(
         if (checked) 1f else 0f,
         if (reducedMotion) tween(0) else spring(dampingRatio = .48f, stiffness = 520f),
         label = "ritual check reveal"
     )
     Box(
-        Modifier.size(48.dp).scale(1f + reveal * .10f).clip(CircleShape).clickable(onClick = onClick).semantics {
+        Modifier.size(48.dp).scale(if (minimalMode) 1f else 1f + reveal * .10f).clip(CircleShape).clickable(onClick = onClick).semantics {
             role = Role.Checkbox
             contentDescription = if (checked) "Marcar como no realizado" else "Marcar como realizado"
         }, contentAlignment = Alignment.Center
@@ -1167,8 +1188,10 @@ private fun SketchCheck(checked: Boolean, onClick: () -> Unit) {
                 val secondEnd = Offset(size.width * .43f + size.width * .36f * reveal, size.height * .72f - size.height * .44f * reveal)
                 drawLine(checkColor, firstStart, firstEnd, 3.dp.toPx(), StrokeCap.Round)
                 drawLine(checkColor, secondStart, secondEnd, 3.dp.toPx(), StrokeCap.Round)
-                drawLine(checkColor.copy(alpha = reveal * .55f), Offset(size.width * .08f, size.height * .20f), Offset(size.width * .02f, size.height * .09f), 1.5.dp.toPx(), StrokeCap.Round)
-                drawLine(checkColor.copy(alpha = reveal * .55f), Offset(size.width * .83f, size.height * .17f), Offset(size.width * .91f, size.height * .07f), 1.5.dp.toPx(), StrokeCap.Round)
+                if (!minimalMode) {
+                    drawLine(checkColor.copy(alpha = reveal * .55f), Offset(size.width * .08f, size.height * .20f), Offset(size.width * .02f, size.height * .09f), 1.5.dp.toPx(), StrokeCap.Round)
+                    drawLine(checkColor.copy(alpha = reveal * .55f), Offset(size.width * .83f, size.height * .17f), Offset(size.width * .91f, size.height * .07f), 1.5.dp.toPx(), StrokeCap.Round)
+                }
             }
         }
     }
@@ -1218,23 +1241,25 @@ private fun EmptyNote(title: String, subtitle: String, action: (() -> Unit)?, il
 
 @Composable
 private fun SketchNavigation(selected: Section, onSelect: (Section) -> Unit) {
+    val minimalMode = LocalMinimalMode.current
+    val reducedMotion = LocalReducedMotion.current
     val indicator = Coral
-    Surface(color = PaperRaised.copy(alpha = .98f), shadowElevation = 12.dp, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
+    Surface(color = PaperRaised.copy(alpha = .98f), shadowElevation = if (minimalMode) 0.dp else 12.dp, shape = RoundedCornerShape(topStart = if (minimalMode) 0.dp else 24.dp, topEnd = if (minimalMode) 0.dp else 24.dp)) {
         Row(
             Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 10.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             Section.entries.forEach { section ->
                 val active = section == selected
-                val tint by animateColorAsState(if (active) Coral else MutedInk, tween(220), label = "nav tint")
+                val tint by animateColorAsState(if (active) Coral else MutedInk, tween(if (reducedMotion) 0 else 220), label = "nav tint")
                 Column(
-                    Modifier.weight(1f).scale(if (active) 1f else .96f)
+                    Modifier.weight(1f).scale(if (minimalMode || active) 1f else .96f)
                         .clip(RoundedCornerShape(16.dp))
                         .background(if (active) Coral.copy(alpha = .10f) else Color.Transparent)
                         .clickable { onSelect(section) }.padding(vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(section.symbol, color = tint, fontWeight = FontWeight.Black, fontSize = 20.sp)
+                    Text(if (minimalMode && section == Section.TODAY) "○" else section.symbol, color = tint, fontWeight = FontWeight.Black, fontSize = 20.sp)
                     Text(section.label, color = if (active) Ink else MutedInk, fontSize = 12.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)
                     Canvas(Modifier.width(28.dp).height(3.dp)) {
                         if (active) drawLine(indicator, Offset(4.dp.toPx(), center.y), Offset(size.width - 2.dp.toPx(), center.y), 2.dp.toPx(), StrokeCap.Round)
@@ -1505,16 +1530,22 @@ private fun ComposerLayout(title: String, subtitle: String, content: @Composable
 
 @Composable
 private fun SaveButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val minimalMode = LocalMinimalMode.current
     Button(
         onClick = onClick, enabled = enabled,
         modifier = Modifier.fillMaxWidth().height(54.dp),
-        shape = RoundedCornerShape(14.dp, 20.dp, 12.dp, 18.dp),
+        shape = if (minimalMode) RoundedCornerShape(12.dp) else RoundedCornerShape(14.dp, 20.dp, 12.dp, 18.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Coral)
     ) { Text(label, color = Color.White, fontWeight = FontWeight.Bold) }
 }
 
-private fun Modifier.sketchBorder(color: Color): Modifier = drawBehind {
-    val stroke = 1.25.dp.toPx()
-    drawRoundRect(color, style = Stroke(stroke, pathEffect = PathEffect.cornerPathEffect(5.dp.toPx())), cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx()))
-    drawLine(color.copy(alpha = .22f), Offset(12.dp.toPx(), size.height + 1.dp.toPx()), Offset(size.width - 8.dp.toPx(), size.height - 1.dp.toPx()), stroke, StrokeCap.Round)
+@Composable
+private fun Modifier.sketchBorder(color: Color): Modifier {
+    val minimalMode = LocalMinimalMode.current
+    val minimalInk = Ink.copy(alpha = .14f)
+    return if (minimalMode) border(1.dp, minimalInk, RoundedCornerShape(12.dp)) else drawBehind {
+        val stroke = 1.25.dp.toPx()
+        drawRoundRect(color, style = Stroke(stroke, pathEffect = PathEffect.cornerPathEffect(5.dp.toPx())), cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx()))
+        drawLine(color.copy(alpha = .22f), Offset(12.dp.toPx(), size.height + 1.dp.toPx()), Offset(size.width - 8.dp.toPx(), size.height - 1.dp.toPx()), stroke, StrokeCap.Round)
+    }
 }

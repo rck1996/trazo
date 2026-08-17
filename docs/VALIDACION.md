@@ -196,3 +196,10 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - Tras precisar el alcance de los puntos 6/7, el Pomodoro pasó de dos recursos a cuatro estados ilustrados: preparado, enfoque activo con lápiz, pausa con ojos cerrados y taza de descanso. La selección de estado tiene prueba unitaria propia.
 - El pase final `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 26 pruebas, 0 fallos y 0 errores de Lint.
 - La compilación final se instaló con `Success` y sustituyó `/sdcard/Download/Trazo-3.3.0.apk`. Por indicación del usuario, la comprobación visual de los cuatro estados queda a cargo de su prueba manual; no se realizaron más interacciones automatizadas con la interfaz.
+
+## Validación de la versión 3.3.1
+
+- La auditoría de consistencia encontró y eliminó color, ilustraciones, textura, sombras, bordes sketch, tipografía decorativa, emojis y animaciones que aún aparecían en la vista minimalista.
+- App, Pomodoro, pantalla siempre activa y estilo minimalista del widget comparten ahora la misma regla monocromática y mantienen visibles solo datos y acciones funcionales.
+- `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 26 pruebas, 0 fallos y 0 errores de Lint.
+- El APK generado corresponde a `versionCode=20`, `versionName=3.3.1`. La inspección visual queda expresamente para la prueba manual del usuario; la instalación no automatiza interacciones con la interfaz.

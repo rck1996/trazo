@@ -101,7 +101,16 @@ class TrazoCollectionService : RemoteViewsService() {
             val task = tasks.getOrNull(position) ?: return null
             return RemoteViews(context.packageName, R.layout.widget_task_stack_item).apply {
                 val config = WidgetPreferences.load(context, widgetId)
-                setViewVisibility(R.id.widget_task_item_image, if (config.style == WidgetStyle.MINIMAL) android.view.View.GONE else android.view.View.VISIBLE)
+                val minimal = config.style == WidgetStyle.MINIMAL
+                setViewVisibility(R.id.widget_task_item_image, if (minimal) android.view.View.GONE else android.view.View.VISIBLE)
+                if (minimal) {
+                    setInt(R.id.widget_task_item, "setBackgroundResource", R.drawable.widget_surface_minimal)
+                    setInt(R.id.widget_task_item_complete, "setBackgroundResource", R.drawable.widget_button_minimal)
+                    setTextColor(R.id.widget_task_item_mark, android.graphics.Color.DKGRAY)
+                    setTextColor(R.id.widget_task_item_title, android.graphics.Color.BLACK)
+                    setTextColor(R.id.widget_task_item_meta, android.graphics.Color.DKGRAY)
+                    setTextColor(R.id.widget_task_item_complete, android.graphics.Color.WHITE)
+                }
                 if (Build.VERSION.SDK_INT >= 31) itemHeightDp?.let {
                     setViewLayoutHeight(R.id.widget_task_item, it.toFloat(), TypedValue.COMPLEX_UNIT_DIP)
                 }
@@ -139,13 +148,22 @@ class TrazoCollectionService : RemoteViewsService() {
             val streak = HabitProgress.streak(habit, today)
             return RemoteViews(context.packageName, R.layout.widget_habit_stack_item).apply {
                 val config = WidgetPreferences.load(context, widgetId)
-                setViewVisibility(R.id.widget_habit_item_image, if (config.style == WidgetStyle.MINIMAL) android.view.View.GONE else android.view.View.VISIBLE)
+                val minimal = config.style == WidgetStyle.MINIMAL
+                setViewVisibility(R.id.widget_habit_item_image, if (minimal) android.view.View.GONE else android.view.View.VISIBLE)
+                if (minimal) {
+                    setInt(R.id.widget_habit_item, "setBackgroundResource", R.drawable.widget_surface_minimal)
+                    setInt(R.id.widget_habit_item_check, "setBackgroundResource", R.drawable.widget_button_minimal)
+                    setTextColor(R.id.widget_habit_item_title, android.graphics.Color.BLACK)
+                    setTextColor(R.id.widget_habit_item_meta, android.graphics.Color.DKGRAY)
+                    setTextColor(R.id.widget_habit_item_check, android.graphics.Color.WHITE)
+                }
                 if (Build.VERSION.SDK_INT >= 31) itemHeightDp?.let {
                     setViewLayoutHeight(R.id.widget_habit_item, it.toFloat(), TypedValue.COMPLEX_UNIT_DIP)
                 }
                 setImageViewResource(R.id.widget_habit_item_image, habitIllustration(habit))
                 setTextViewText(R.id.widget_habit_item_title,
-                    if (config.privacy == WidgetPrivacy.DISCREET) "Ritual privado" else "${habit.emoji}  ${habit.title}")
+                    if (config.privacy == WidgetPrivacy.DISCREET) "Ritual privado"
+                    else if (minimal) habit.title else "${habit.emoji}  ${habit.title}")
                 setTextViewText(
                     R.id.widget_habit_item_meta,
                     if (config.privacy == WidgetPrivacy.DISCREET) "Toca ✓ para cambiar el estado"

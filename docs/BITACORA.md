@@ -185,8 +185,18 @@ La captura por voz del widget ahora presenta una revisión breve antes de guarda
 - Hoy incluye una revisión diaria/semanal local con tareas completadas, atrasos, cumplimiento de rituales, minutos de enfoque y una sugerencia accionable.
 - El Pomodoro conserva enfoque, pausa corta, pausa larga, cantidad de ciclos y avance automático. El servicio puede alternar fases aun con la aplicación en segundo plano.
 - Los widgets grandes admiten etiqueta, solo atrasadas, privacidad completa/discreta y estilo ilustrado/minimalista por instancia.
-- Ajustes incorpora una vista minimalista general: reduce movimiento y elimina ilustraciones decorativas manteniendo las imágenes funcionales del Pomodoro.
+- Ajustes incorpora una vista minimalista general que reduce movimiento y elimina ilustraciones decorativas.
 - Los estados vacíos ahora usan ilustraciones sketch contextuales; con modo minimalista vuelven a una presentación tipográfica.
 - La auditoría posterior completó los puntos visuales: Hoy cambia entre ilustraciones IA de mañana, tarde y noche; el encabezado respira suavemente, las listas animan altas/bajas y el check de ritual se dibuja progresivamente. Todo respeta Movimiento reducido y la vista minimalista.
 - Las sugerencias combinan atrasos, cumplimiento, tareas terminadas y minutos de enfoque. El editor de hábitos permite elegir intervalos de 1 a 12 semanas y omitir fechas con calendario, sin exigir formato ISO.
-- El alcance visual 6/7 se completó también dentro del Pomodoro con cuatro ilustraciones distintas: tomate preparado, tomate concentrado con lápiz, tomate descansando y taza. Se suman trazos pulsantes en Enfoque, vapor en Descanso, mensajes según el tramo y transición ilustrada entre estados. Movimiento reducido y modo minimalista conservan las imágenes sin animarlas.
+- El alcance visual 6/7 se completó también dentro del Pomodoro ilustrado con cuatro imágenes distintas: tomate preparado, tomate concentrado con lápiz, tomate descansando y taza. Se suman trazos pulsantes en Enfoque, vapor en Descanso, mensajes según el tramo y transición ilustrada entre estados. Movimiento reducido conserva las imágenes sin animarlas; el modo minimalista las sustituye por información tipográfica.
+
+## 20. Minimalismo coherente — versión 3.3.1
+
+La vista minimalista dejó de ser únicamente una reducción de movimiento. Ahora impone una identidad monocromática completa e independiente del tema del sistema: fondo blanco, tinta negra y grises reservados para información secundaria.
+
+- Se retiran papel rayado, ilustraciones, bordes irregulares, sombras, inclinaciones, escalados decorativos y tipografía serif.
+- Pomodoro reemplaza tomate, taza, vapor y pulsos por fase, reloj, contexto y una barra lineal precisa. La pantalla siempre activa también queda en blanco y negro y sin ilustración.
+- Los hábitos sustituyen su emoji a color por una marca geométrica neutra; las transiciones residuales de tarjetas, progreso, navegación y calendario se resuelven de inmediato.
+- El widget minimalista usa papel blanco, filas y rótulos neutros, botones rectos en negro y texto sin emojis; oculta arte, saludo, porcentaje ornamental y ritmo ilustrado.
+- El modo ilustrado conserva intactas las acuarelas, recursos IA, animaciones y paleta artística.

@@ -30,6 +30,17 @@ private val DarkPalette = TrazoPalette(
     Color(0xFF141311), Color(0xFF24211E), Color(0xFFFFF7E8), Color(0xFFD2C8BA),
     Color(0xFFFF836A), Color(0xFFF4C668), Color(0xFF71B996), Color(0xFF7EB5CC), Color(0xFFB99BCB)
 )
+private val MinimalPalette = TrazoPalette(
+    paper = Color.White,
+    raised = Color.White,
+    ink = Color.Black,
+    muted = Color(0xFF555555),
+    coral = Color.Black,
+    mustard = Color.Black,
+    leaf = Color.Black,
+    sky = Color.Black,
+    lavender = Color.Black
+)
 private val LocalTrazoPalette = staticCompositionLocalOf { LightPalette }
 val LocalReducedMotion = staticCompositionLocalOf { false }
 val LocalTrazoHaptics = staticCompositionLocalOf { true }
@@ -52,8 +63,13 @@ fun TrazoTheme(settings: AppSettings = AppSettings(), content: @Composable () ->
         ThemePreference.LIGHT -> false
         ThemePreference.SYSTEM -> isSystemInDarkTheme()
     }
-    val palette = if (dark) DarkPalette else LightPalette
-    val colors = if (dark) darkColorScheme(
+    val palette = when {
+        settings.minimalMode -> MinimalPalette
+        dark -> DarkPalette
+        else -> LightPalette
+    }
+    val useDarkScheme = dark && !settings.minimalMode
+    val colors = if (useDarkScheme) darkColorScheme(
         primary = palette.coral, secondary = palette.leaf, tertiary = palette.mustard,
         background = palette.paper, onBackground = palette.ink,
         surface = palette.raised, onSurface = palette.ink, outline = palette.muted
@@ -65,6 +81,7 @@ fun TrazoTheme(settings: AppSettings = AppSettings(), content: @Composable () ->
     )
     val density = LocalDensity.current
     val scaledDensity = Density(density.density, if (settings.largeText) density.fontScale * 1.15f else density.fontScale)
+    val displayFamily = if (settings.minimalMode) FontFamily.SansSerif else FontFamily.Serif
     CompositionLocalProvider(
         LocalTrazoPalette provides palette,
         LocalReducedMotion provides (settings.reducedMotion || settings.minimalMode),
@@ -75,9 +92,9 @@ fun TrazoTheme(settings: AppSettings = AppSettings(), content: @Composable () ->
         MaterialTheme(
             colorScheme = colors,
             typography = MaterialTheme.typography.copy(
-                displaySmall = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Black, fontSize = 37.sp, letterSpacing = (-1).sp, color = palette.ink),
-                headlineMedium = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Black, fontSize = 30.sp, letterSpacing = (-0.5).sp, color = palette.ink),
-                titleLarge = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 23.sp, color = palette.ink),
+                displaySmall = TextStyle(fontFamily = displayFamily, fontWeight = FontWeight.Black, fontSize = 37.sp, letterSpacing = if (settings.minimalMode) 0.sp else (-1).sp, color = palette.ink),
+                headlineMedium = TextStyle(fontFamily = displayFamily, fontWeight = FontWeight.Black, fontSize = 30.sp, letterSpacing = if (settings.minimalMode) 0.sp else (-0.5).sp, color = palette.ink),
+                titleLarge = TextStyle(fontFamily = displayFamily, fontWeight = FontWeight.Bold, fontSize = 23.sp, color = palette.ink),
                 titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = palette.ink),
                 bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 16.sp, color = palette.ink),
                 labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = palette.ink)

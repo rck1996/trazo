@@ -205,10 +205,11 @@ class TrazoWidget : AppWidgetProvider() {
             }
 
             return RemoteViews(context.packageName, R.layout.trazo_widget).apply {
+                val minimal = config.style == WidgetStyle.MINIMAL
                 setInt(
                     R.id.widget_root,
                     "setBackgroundResource",
-                    if (config.style == WidgetStyle.MINIMAL) R.drawable.widget_paper_minimal else when (config.palette) {
+                    if (minimal) R.drawable.widget_paper_minimal else when (config.palette) {
                         WidgetPalette.CORAL -> R.drawable.widget_paper
                         WidgetPalette.BOTANICAL -> R.drawable.widget_paper_botanical
                         WidgetPalette.INK -> R.drawable.widget_paper_ink
@@ -217,15 +218,35 @@ class TrazoWidget : AppWidgetProvider() {
                 setInt(
                     R.id.widget_focus_action,
                     "setBackgroundResource",
-                    when (config.palette) {
+                    if (minimal) R.drawable.widget_button_minimal else when (config.palette) {
                         WidgetPalette.CORAL -> R.drawable.widget_button_coral
                         WidgetPalette.BOTANICAL -> R.drawable.widget_button_botanical
                         WidgetPalette.INK -> R.drawable.widget_button_ink
                     }
                 )
+                if (minimal) {
+                    setInt(R.id.widget_task_label, "setBackgroundResource", R.drawable.widget_label_minimal)
+                    setInt(R.id.widget_habit_label, "setBackgroundResource", R.drawable.widget_label_minimal)
+                    setInt(R.id.widget_task_empty, "setBackgroundResource", R.drawable.widget_surface_minimal)
+                    setInt(R.id.widget_habit_empty, "setBackgroundResource", R.drawable.widget_surface_minimal)
+                    setInt(R.id.widget_planner, "setBackgroundResource", R.drawable.widget_surface_minimal)
+                    setTextColor(R.id.widget_date_minimal, android.graphics.Color.BLACK)
+                    setTextColor(R.id.widget_task_label, android.graphics.Color.BLACK)
+                    setTextColor(R.id.widget_habit_label, android.graphics.Color.BLACK)
+                    setTextColor(R.id.widget_planner, android.graphics.Color.BLACK)
+                    setTextColor(R.id.widget_focus_action, android.graphics.Color.WHITE)
+                    setTextColor(R.id.widget_task_empty_eyebrow, android.graphics.Color.DKGRAY)
+                    setTextColor(R.id.widget_task_empty_title, android.graphics.Color.BLACK)
+                    setTextColor(R.id.widget_task_empty_meta, android.graphics.Color.DKGRAY)
+                    setTextColor(R.id.widget_habit_empty_title, android.graphics.Color.BLACK)
+                    setTextColor(R.id.widget_habit_empty_meta, android.graphics.Color.DKGRAY)
+                }
                 setViewVisibility(R.id.widget_rhythm, if (compact || config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
                 setViewVisibility(R.id.widget_greeting, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
                 setViewVisibility(R.id.widget_header_art, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
+                setViewVisibility(R.id.widget_date, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
+                setViewVisibility(R.id.widget_date_minimal, if (config.style == WidgetStyle.MINIMAL) View.VISIBLE else View.GONE)
+                setViewVisibility(R.id.widget_progress_percent, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
                 setViewVisibility(R.id.widget_task_empty_art, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
                 setViewVisibility(R.id.widget_habit_empty_art, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
                 setViewVisibility(R.id.widget_task_label, if (showTasks) View.VISIBLE else View.GONE)
@@ -249,6 +270,7 @@ class TrazoWidget : AppWidgetProvider() {
                     }
                 )
                 setTextViewText(R.id.widget_date, date)
+                setTextViewText(R.id.widget_date_minimal, date)
                 setTextViewText(R.id.widget_greeting, greeting)
                 setTextViewText(R.id.widget_progress_percent, "$progress%")
                 setProgressBar(R.id.widget_day_progress, 100, progress, false)
@@ -304,7 +326,8 @@ class TrazoWidget : AppWidgetProvider() {
                     when (focusSession?.phase) {
                         "BREAK" -> "■  Detener descanso"
                         "FOCUS" -> "■  Detener enfoque"
-                        else -> "🍅  Iniciar ${config.focusMinutes} min"
+                        else -> if (config.style == WidgetStyle.MINIMAL) "Iniciar ${config.focusMinutes} min"
+                            else "🍅  Iniciar ${config.focusMinutes} min"
                     }
                 )
             }

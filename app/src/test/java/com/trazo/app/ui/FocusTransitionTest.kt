@@ -23,4 +23,11 @@ class FocusTransitionTest {
         assertEquals(1f, elapsedTimerProgress(-1, 1_500), 0.0001f)
         assertEquals(0f, elapsedTimerProgress(10, 0), 0.0001f)
     }
+
+    @Test fun pomodoroIllustrationFollowsTheVisibleState() {
+        assertEquals(FocusArtState.READY, focusArtState(FocusPhase.FOCUS, false, 1_500, 1_500))
+        assertEquals(FocusArtState.ACTIVE, focusArtState(FocusPhase.FOCUS, true, 1_499, 1_500))
+        assertEquals(FocusArtState.PAUSED, focusArtState(FocusPhase.FOCUS, false, 1_200, 1_500))
+        assertEquals(FocusArtState.BREAK, focusArtState(FocusPhase.BREAK, true, 300, 300))
+    }
 }

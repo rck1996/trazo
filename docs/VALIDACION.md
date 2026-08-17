@@ -192,3 +192,7 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - El estilo minimalista del widget usa ahora una superficie propia y oculta todas sus imágenes decorativas. La privacidad discreta también neutraliza emoji, prioridad, racha, metadatos y descripciones de accesibilidad.
 - El pase posterior `testDebugUnitTest lintDebug assembleRelease assembleDebug` terminó con `BUILD SUCCESSFUL`: 25 pruebas, 0 fallos y 0 errores de Lint.
 - El APK actualizado se instaló incrementalmente con `Success`; la inspección física confirmó que la barra comienza dentro de su pista y el arranque cálido terminó en 283 ms.
+- La demostración nocturna detectó que 00:00–04:59 compartía por error la ilustración matinal; el rango se alineó con el saludo: mañana 05–11, tarde 12–19 y noche 20–04.
+- Tras precisar el alcance de los puntos 6/7, el Pomodoro pasó de dos recursos a cuatro estados ilustrados: preparado, enfoque activo con lápiz, pausa con ojos cerrados y taza de descanso. La selección de estado tiene prueba unitaria propia.
+- El pase final `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 26 pruebas, 0 fallos y 0 errores de Lint.
+- La compilación final se instaló con `Success` y sustituyó `/sdcard/Download/Trazo-3.3.0.apk`. Por indicación del usuario, la comprobación visual de los cuatro estados queda a cargo de su prueba manual; no se realizaron más interacciones automatizadas con la interfaz.

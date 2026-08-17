@@ -4,6 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -29,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -56,9 +63,19 @@ import com.trazo.app.notifications.FocusTimerService
 import kotlinx.coroutines.delay
 
 internal enum class FocusPhase { FOCUS, BREAK }
+internal enum class FocusArtState { READY, ACTIVE, PAUSED, BREAK }
 
 internal fun nextFocusPhase(phase: FocusPhase): FocusPhase =
     if (phase == FocusPhase.FOCUS) FocusPhase.BREAK else FocusPhase.FOCUS
+
+internal fun focusArtState(
+    phase: FocusPhase, running: Boolean, remaining: Int, total: Int
+): FocusArtState = when {
+    phase == FocusPhase.BREAK -> FocusArtState.BREAK
+    running -> FocusArtState.ACTIVE
+    remaining in 1 until total -> FocusArtState.PAUSED
+    else -> FocusArtState.READY
+}
 
 internal fun elapsedTimerProgress(remaining: Int, total: Int): Float {
     if (total <= 0) return 0f
@@ -405,6 +422,8 @@ private fun AmbientIllustration(phase: FocusPhase, running: Boolean) {
 @Composable
 private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle: String?, running: Boolean) {
     val motionEnabled = !LocalReducedMotion.current && !LocalMinimalMode.current
+    val paused = !running && remaining in 1 until total
+    val artState = focusArtState(phase, running, remaining, total)
     val progressTrack = Ink.copy(alpha = .12f)
     val progressColor = if (phase == FocusPhase.FOCUS) Coral else Leaf
     val progress by animateFloatAsState(
@@ -427,6 +446,17 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
         animationSpec = infiniteRepeatable(tween(2100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "hand drawn sway"
     )
+    val motionEnergy = ((breathe - .985f) / .06f).coerceIn(0f, 1f)
+    val contextMessage = when {
+        paused && phase == FocusPhase.FOCUS -> "Pausa · tu progreso está guardado"
+        paused -> "Descanso en pausa"
+        !running && phase == FocusPhase.FOCUS -> taskTitle ?: "Listo para empezar"
+        !running -> "La pausa está lista"
+        phase == FocusPhase.BREAK -> "La taza respira contigo"
+        progress < .33f -> taskTitle ?: "El tomate toma impulso"
+        progress < .75f -> taskTitle ?: "Buen ritmo, sigue con calma"
+        else -> taskTitle ?: "Último tramo"
+    }
     LaunchedEffect(running, phase) {
         if (running && motionEnabled) {
             pop.snapTo(.94f); tilt.snapTo(-2.5f)
@@ -448,26 +478,75 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
             },
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(if (phase == FocusPhase.FOCUS) R.drawable.pomodoro_ai_tomato else R.drawable.pomodoro_ai_cup),
-            contentDescription = if (phase == FocusPhase.FOCUS) "Tomate de enfoque ilustrado" else "Taza de descanso ilustrada",
-            contentScale = ContentScale.Fit,
-            alpha = .88f,
-            modifier = Modifier.size(278.dp, 248.dp)
-        )
+        AnimatedContent(
+            targetState = artState,
+            transitionSpec = {
+                (fadeIn(tween(if (motionEnabled) 380 else 0)) + scaleIn(tween(if (motionEnabled) 420 else 0), initialScale = .88f)) togetherWith
+                    (fadeOut(tween(if (motionEnabled) 220 else 0)) + scaleOut(tween(if (motionEnabled) 250 else 0), targetScale = 1.08f))
+            },
+            label = "focus break illustration"
+        ) { visualState ->
+            val illustration = when (visualState) {
+                FocusArtState.READY -> R.drawable.pomodoro_ai_tomato
+                FocusArtState.ACTIVE -> R.drawable.pomodoro_ai_focus_active
+                FocusArtState.PAUSED -> R.drawable.pomodoro_ai_focus_paused
+                FocusArtState.BREAK -> R.drawable.pomodoro_ai_cup
+            }
+            Image(
+                painter = painterResource(illustration),
+                contentDescription = when (visualState) {
+                    FocusArtState.READY -> "Tomate preparado para comenzar"
+                    FocusArtState.ACTIVE -> "Tomate concentrado sosteniendo un lápiz"
+                    FocusArtState.PAUSED -> "Tomate descansando con los ojos cerrados"
+                    FocusArtState.BREAK -> "Taza de descanso ilustrada"
+                },
+                contentScale = ContentScale.Fit,
+                alpha = .90f,
+                modifier = Modifier.size(278.dp, 248.dp)
+            )
+        }
         Canvas(Modifier.size(292.dp, 260.dp)) {
             val lineY = size.height * .84f
             val startX = size.width * .22f
             val endX = startX + size.width * .56f * progress
             drawLine(progressTrack, Offset(startX, lineY), Offset(size.width * .78f, lineY), 7.dp.toPx(), StrokeCap.Round)
             drawLine(progressColor, Offset(startX, lineY), Offset(endX, lineY), 7.dp.toPx(), StrokeCap.Round)
+            if (running && motionEnabled && phase == FocusPhase.FOCUS) {
+                val accent = progressColor.copy(alpha = .28f + motionEnergy * .38f)
+                val reach = (7.dp + 5.dp * motionEnergy).toPx()
+                listOf(.31f, .43f, .55f).forEachIndexed { index, yFraction ->
+                    val y = size.height * yFraction
+                    drawLine(accent, Offset(size.width * .13f, y), Offset(size.width * .13f - reach, y - (index - 1) * 3.dp.toPx()), 2.dp.toPx(), StrokeCap.Round)
+                    drawLine(accent, Offset(size.width * .87f, y), Offset(size.width * .87f + reach, y + (index - 1) * 3.dp.toPx()), 2.dp.toPx(), StrokeCap.Round)
+                }
+            }
+            if (running && motionEnabled && phase == FocusPhase.BREAK) {
+                val steam = progressColor.copy(alpha = .22f + motionEnergy * .34f)
+                val lift = (motionEnergy * 7.dp.toPx())
+                listOf(.43f, .50f, .57f).forEachIndexed { index, xFraction ->
+                    drawArc(
+                        color = steam,
+                        startAngle = 145f,
+                        sweepAngle = 150f,
+                        useCenter = false,
+                        topLeft = Offset(size.width * xFraction - 8.dp.toPx(), size.height * .10f - lift - index * 2.dp.toPx()),
+                        size = Size(16.dp.toPx(), 30.dp.toPx()),
+                        style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+            }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 22.dp)) {
-            Text(if (phase == FocusPhase.FOCUS) "ENFOQUE" else "DESCANSO", color = if (phase == FocusPhase.FOCUS) Coral else Leaf, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Text(
+                when { paused -> "PAUSA"; phase == FocusPhase.FOCUS -> "ENFOQUE"; else -> "DESCANSO" },
+                color = if (phase == FocusPhase.FOCUS) Coral else Leaf,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp
+            )
             Surface(color = Paper.copy(alpha = .94f), shape = RoundedCornerShape(10.dp, 18.dp, 12.dp, 16.dp), modifier = Modifier.padding(vertical = 5.dp)) {
                 Text("%02d:%02d".format(remaining/60,remaining%60), fontSize=46.sp, fontWeight=FontWeight.Black, color=Ink, modifier=Modifier.padding(horizontal = 18.dp, vertical = 2.dp))
             }
-            Text(if (phase == FocusPhase.BREAK) "Vuelve con calma" else taskTitle ?: "Sin tarea asociada", color=MutedInk, fontSize=if (phase == FocusPhase.BREAK) 13.sp else 14.sp, maxLines=1, overflow=TextOverflow.Ellipsis, textAlign=androidx.compose.ui.text.style.TextAlign.Center, modifier=Modifier.width(if (phase == FocusPhase.BREAK) 142.dp else 172.dp).padding(top=4.dp))
+            Text(contextMessage, color=MutedInk, fontSize=13.sp, maxLines=2, overflow=TextOverflow.Ellipsis, textAlign=androidx.compose.ui.text.style.TextAlign.Center, modifier=Modifier.width(190.dp).padding(top=4.dp))
         }
     }
 }

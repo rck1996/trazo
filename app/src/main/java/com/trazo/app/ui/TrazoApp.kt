@@ -320,8 +320,8 @@ private fun PageHeader(
     val hour = remember { LocalTime.now().hour }
     val contextualIllustration = when {
         onOpenSettings == null -> R.drawable.header_ai_notebook
-        hour < 12 -> R.drawable.context_ai_morning
-        hour < 19 -> R.drawable.context_ai_afternoon
+        hour in 5..11 -> R.drawable.context_ai_morning
+        hour in 12..19 -> R.drawable.context_ai_afternoon
         else -> R.drawable.context_ai_evening
     }
     val artMotion = rememberInfiniteTransition(label = "contextual header art")

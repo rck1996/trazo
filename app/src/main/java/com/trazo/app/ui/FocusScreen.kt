@@ -47,6 +47,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import android.view.WindowManager
 import com.trazo.app.R
+import com.trazo.app.data.FocusPreferences
+import com.trazo.app.data.FocusPreferencesStore
 import com.trazo.app.model.Task
 import com.trazo.app.notifications.FocusSessionStore
 import com.trazo.app.notifications.FocusTimerService
@@ -60,16 +62,17 @@ internal fun nextFocusPhase(phase: FocusPhase): FocusPhase =
 @Composable
 internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComplete: (String) -> Unit) {
     val context = LocalContext.current
+    val storedPreferences = remember { FocusPreferencesStore.load(context) }
     val pending = tasks.filterNot { it.completed }
     val restoredSession = remember { FocusSessionStore.load(context) }
     var selectedTaskId by rememberSaveable {
         mutableStateOf(tasks.firstOrNull { it.title == restoredSession?.taskTitle }?.id)
     }
     var focusMinutes by rememberSaveable {
-        mutableIntStateOf(if (restoredSession?.phase == FocusPhase.FOCUS.name) (restoredSession.totalSeconds / 60).coerceAtLeast(1) else 25)
+        mutableIntStateOf(if (restoredSession?.phase == FocusPhase.FOCUS.name) (restoredSession.totalSeconds / 60).coerceAtLeast(1) else storedPreferences.focusMinutes)
     }
     var breakMinutes by rememberSaveable {
-        mutableIntStateOf(if (restoredSession?.phase == FocusPhase.BREAK.name) (restoredSession.totalSeconds / 60).coerceAtLeast(1) else 5)
+        mutableIntStateOf(if (restoredSession?.phase == FocusPhase.BREAK.name) (restoredSession.totalSeconds / 60).coerceAtLeast(1) else storedPreferences.shortBreakMinutes)
     }
     var phaseName by rememberSaveable { mutableStateOf(restoredSession?.phase ?: FocusPhase.FOCUS.name) }
     var remaining by rememberSaveable {
@@ -81,6 +84,11 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
     var customDialog by rememberSaveable { mutableStateOf(false) }
     var customFocus by rememberSaveable { mutableStateOf("25") }
     var customBreak by rememberSaveable { mutableStateOf("5") }
+    var customLongBreak by rememberSaveable { mutableStateOf(storedPreferences.longBreakMinutes.toString()) }
+    var customCycles by rememberSaveable { mutableStateOf(storedPreferences.cyclesBeforeLongBreak.toString()) }
+    var longBreakMinutes by rememberSaveable { mutableIntStateOf(storedPreferences.longBreakMinutes) }
+    var cyclesBeforeLong by rememberSaveable { mutableIntStateOf(storedPreferences.cyclesBeforeLongBreak) }
+    var autoAdvance by rememberSaveable { mutableStateOf(storedPreferences.autoAdvance) }
     var ambientMode by rememberSaveable { mutableStateOf(false) }
     val phase = FocusPhase.valueOf(phaseName)
     val total = if (phase == FocusPhase.FOCUS) focusMinutes * 60 else breakMinutes * 60
@@ -104,6 +112,12 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
                 putExtra(FocusTimerService.EXTRA_END_AT, targetEpoch)
                 putExtra(FocusTimerService.EXTRA_TASK, selectedTask?.title)
                 putExtra(FocusTimerService.EXTRA_PHASE, phase.name)
+                putExtra(FocusTimerService.EXTRA_AUTO_ADVANCE, autoAdvance)
+                putExtra(FocusTimerService.EXTRA_FOCUS_SECONDS, focusMinutes * 60)
+                putExtra(FocusTimerService.EXTRA_SHORT_BREAK_SECONDS, breakMinutes * 60)
+                putExtra(FocusTimerService.EXTRA_LONG_BREAK_SECONDS, longBreakMinutes * 60)
+                putExtra(FocusTimerService.EXTRA_CYCLES_BEFORE_LONG, cyclesBeforeLong)
+                putExtra(FocusTimerService.EXTRA_COMPLETED_SESSIONS, sessions)
             })
         }
     }
@@ -112,7 +126,15 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
                 if (intent?.action == FocusTimerService.ACTION_STATE_CHANGED) {
-                    running = false; phaseName = FocusPhase.FOCUS.name; remaining = focusMinutes * 60
+                    if (intent.getBooleanExtra(FocusTimerService.EXTRA_RUNNING, false)) {
+                        phaseName = intent.getStringExtra(FocusTimerService.EXTRA_PHASE) ?: FocusPhase.FOCUS.name
+                        targetEpoch = intent.getLongExtra(FocusTimerService.EXTRA_END_AT, 0L)
+                        remaining = intent.getIntExtra(FocusTimerService.EXTRA_TOTAL_SECONDS, focusMinutes * 60)
+                        running = true
+                        if (phaseName == FocusPhase.BREAK.name) sessions++
+                    } else {
+                        running = false; phaseName = FocusPhase.FOCUS.name; remaining = focusMinutes * 60
+                    }
                 }
             }
         }
@@ -125,10 +147,12 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
             remaining = ((targetEpoch - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0)
             if (remaining == 0) {
                 running = false
-                if (phase == FocusPhase.FOCUS) sessions++
-                val next = nextFocusPhase(phase)
-                phaseName = next.name
-                remaining = if (next == FocusPhase.FOCUS) focusMinutes * 60 else breakMinutes * 60
+                if (!autoAdvance) {
+                    if (phase == FocusPhase.FOCUS) sessions++
+                    val next = nextFocusPhase(phase)
+                    phaseName = next.name
+                    remaining = if (next == FocusPhase.FOCUS) focusMinutes * 60 else breakMinutes * 60
+                }
                 break
             }
             delay(250)
@@ -150,8 +174,16 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
                 remaining = if (next == FocusPhase.FOCUS) focusMinutes * 60 else breakMinutes * 60
             })
             AmbientModeButton(running) { ambientMode = true }
-            if (!running) Presets(focusMinutes, { f, b -> focusMinutes = f; breakMinutes = b; phaseName = FocusPhase.FOCUS.name; remaining = f * 60 }, {
-                customFocus = focusMinutes.toString(); customBreak = breakMinutes.toString(); customDialog = true
+            if (!running) AutoAdvanceCard(autoAdvance) {
+                autoAdvance = it
+                FocusPreferencesStore.save(context, FocusPreferences(focusMinutes, breakMinutes, longBreakMinutes, cyclesBeforeLong, autoAdvance))
+            }
+            if (!running) Presets(focusMinutes, { f, b ->
+                focusMinutes = f; breakMinutes = b; phaseName = FocusPhase.FOCUS.name; remaining = f * 60
+                FocusPreferencesStore.save(context, FocusPreferences(focusMinutes, breakMinutes, longBreakMinutes, cyclesBeforeLong, autoAdvance))
+            }, {
+                customFocus = focusMinutes.toString(); customBreak = breakMinutes.toString()
+                customLongBreak = longBreakMinutes.toString(); customCycles = cyclesBeforeLong.toString(); customDialog = true
             })
             Text("Tarea para esta sesión", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(24.dp, 14.dp, 24.dp, 8.dp))
         }
@@ -170,13 +202,18 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
         onDismissRequest = { customDialog = false }, containerColor = Paper,
         title = { Text("Tu propio ritmo", style = MaterialTheme.typography.titleLarge) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Define minutos de enfoque y pausa.", color = MutedInk)
+            Text("Define el ciclo completo de enfoque y pausas.", color = MutedInk)
             OutlinedTextField(customFocus, { customFocus = it.filter(Char::isDigit).take(3) }, label = { Text("Enfoque (1–180)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
             OutlinedTextField(customBreak, { customBreak = it.filter(Char::isDigit).take(2) }, label = { Text("Pausa (1–60)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+            OutlinedTextField(customLongBreak, { customLongBreak = it.filter(Char::isDigit).take(2) }, label = { Text("Pausa larga (1–90)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+            OutlinedTextField(customCycles, { customCycles = it.filter(Char::isDigit).take(1) }, label = { Text("Pausa larga cada ciclos (2–8)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
         } },
         confirmButton = { TextButton(onClick = {
             focusMinutes = customFocus.toIntOrNull()?.coerceIn(1, 180) ?: 25
             breakMinutes = customBreak.toIntOrNull()?.coerceIn(1, 60) ?: 5
+            longBreakMinutes = customLongBreak.toIntOrNull()?.coerceIn(1, 90) ?: 15
+            cyclesBeforeLong = customCycles.toIntOrNull()?.coerceIn(2, 8) ?: 4
+            FocusPreferencesStore.save(context, FocusPreferences(focusMinutes, breakMinutes, longBreakMinutes, cyclesBeforeLong, autoAdvance))
             phaseName = FocusPhase.FOCUS.name; remaining = focusMinutes * 60; customDialog = false
         }) { Text("Usar tiempos", color = Coral) } },
         dismissButton = { TextButton(onClick = { customDialog = false }) { Text("Cancelar") } }
@@ -192,6 +229,23 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
             onToggle = toggleTimer,
             onClose = { ambientMode = false }
         )
+    }
+}
+
+@Composable
+private fun AutoAdvanceCard(enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Surface(
+        color = Leaf.copy(alpha = .09f),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).fillMaxWidth()
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Ciclo automático", color = Ink, fontWeight = FontWeight.Bold)
+                Text("Alterna enfoque, pausa corta y pausa larga", color = MutedInk, fontSize = 11.sp)
+            }
+            Switch(checked = enabled, onCheckedChange = onChange)
+        }
     }
 }
 
@@ -312,6 +366,7 @@ private fun AmbientFocusMode(
 
 @Composable
 private fun AmbientIllustration(phase: FocusPhase, running: Boolean) {
+    val motionEnabled = !LocalReducedMotion.current && !LocalMinimalMode.current
     val motion = rememberInfiniteTransition(label = "ambient illustration")
     val breathe by motion.animateFloat(
         initialValue = .98f,
@@ -326,7 +381,7 @@ private fun AmbientIllustration(phase: FocusPhase, running: Boolean) {
         alpha = .76f,
         modifier = Modifier.padding(vertical = 24.dp).size(164.dp)
             .graphicsLayer {
-                val scale = if (running) breathe else 1f
+                val scale = if (running && motionEnabled) breathe else 1f
                 scaleX = scale
                 scaleY = scale
             }
@@ -335,6 +390,7 @@ private fun AmbientIllustration(phase: FocusPhase, running: Boolean) {
 
 @Composable
 private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle: String?, running: Boolean) {
+    val motionEnabled = !LocalReducedMotion.current && !LocalMinimalMode.current
     val progressTrack = Ink.copy(alpha = .12f)
     val progressColor = if (phase == FocusPhase.FOCUS) Coral else Leaf
     val progress = if (total == 0) 0f else remaining.toFloat() / total
@@ -354,7 +410,7 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
         label = "hand drawn sway"
     )
     LaunchedEffect(running, phase) {
-        if (running) {
+        if (running && motionEnabled) {
             pop.snapTo(.94f); tilt.snapTo(-2.5f)
             pop.animateTo(1.06f, spring(dampingRatio = .48f, stiffness = 420f))
             tilt.animateTo(1.5f, spring(dampingRatio = .55f, stiffness = 480f))
@@ -367,10 +423,10 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
     Box(
         Modifier.fillMaxWidth().padding(vertical = 14.dp)
             .graphicsLayer {
-                val livingScale = if (running) breathe else 1f
+                val livingScale = if (running && motionEnabled) breathe else 1f
                 scaleX = pop.value * livingScale
                 scaleY = pop.value * livingScale
-                rotationZ = tilt.value + if (running) sway else 0f
+                rotationZ = tilt.value + if (running && motionEnabled) sway else 0f
             },
         contentAlignment = Alignment.Center
     ) {

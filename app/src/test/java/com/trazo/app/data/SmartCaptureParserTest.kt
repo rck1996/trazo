@@ -99,6 +99,22 @@ class SmartCaptureParserTest {
         assertEquals(8, result.input.reminderHour)
     }
 
+    @Test fun understandsFortnightlyRecurrence() {
+        val result = SmartCaptureParser.parse("Spinning lunes y jueves cada dos semanas", today)
+            as SmartCaptureResult.HabitDraft
+        assertEquals("Spinning", result.input.title)
+        assertEquals(2, result.input.repeatEveryWeeks)
+        assertEquals(setOf(DayOfWeek.MONDAY, DayOfWeek.THURSDAY), result.input.days)
+    }
+
+    @Test fun understandsDailyExceptSunday() {
+        val result = SmartCaptureParser.parse("Meditar todos los días excepto domingo", today)
+            as SmartCaptureResult.HabitDraft
+        assertEquals("Meditar", result.input.title)
+        assertTrue(DayOfWeek.SUNDAY !in result.input.days)
+        assertEquals(6, result.input.days.size)
+    }
+
     @Test fun understandsExplicitSpanishDate() {
         val result = SmartCaptureParser.parse("Renovar licencia el 20 de agosto importante", today)
             as SmartCaptureResult.TaskDraft

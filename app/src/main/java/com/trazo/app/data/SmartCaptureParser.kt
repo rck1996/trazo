@@ -43,7 +43,9 @@ object SmartCaptureParser {
             "todos los dias", "cada dia", "diario", "diaria", "habito", "rutina",
             "entre semana", "fin de semana", "fines de semana",
             "cada manana", "cada tarde", "cada noche"
-        ).any(plain::contains) || Regex("\\b(?:cada|los)\\s+(?:$weekdayPattern)\\b").containsMatchIn(plain)
+        ).any(plain::contains) ||
+            Regex("\\b(?:cada|los)\\s+(?:$weekdayPattern)\\b").containsMatchIn(plain) ||
+            Regex("\\bcada\\s+(?:dos|tres|cuatro|\\d+)\\s+semanas?\\b").containsMatchIn(plain)
         val isHabit = "tarea" !in plain && (recurringPhrase || days.size >= 2 || target != null)
         val time = extractTime(plain)
         val explicitDate = extractDate(plain, today)
@@ -66,6 +68,7 @@ object SmartCaptureParser {
                 emoji = category.symbol,
                 category = category,
                 days = if (days.isEmpty()) DayOfWeek.entries.toSet() else days,
+                repeatEveryWeeks = extractWeekInterval(plain),
                 target = target?.first ?: 1,
                 unit = target?.second ?: HabitUnit.CHECK,
                 reminderHour = time?.hour,
@@ -85,16 +88,31 @@ object SmartCaptureParser {
     }
 
     private fun extractDays(text: String): Set<DayOfWeek> {
-        if ("todos los dias" in text) return DayOfWeek.entries.toSet()
-        if ("entre semana" in text || Regex("\\b(?:de\\s+)?lunes\\s+a\\s+viernes\\b").containsMatchIn(text)) {
-            return DayOfWeek.entries.take(5).toSet()
+        val base = when {
+            "todos los dias" in text -> DayOfWeek.entries.toSet()
+            "entre semana" in text || Regex("\\b(?:de\\s+)?lunes\\s+a\\s+viernes\\b").containsMatchIn(text) ->
+                DayOfWeek.entries.take(5).toSet()
+            "fin de semana" in text || "fines de semana" in text ->
+                setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
+            else -> dayNames.mapNotNull { (day, names) ->
+                day.takeIf { Regex("\\b(?:$names)\\b").containsMatchIn(text) }
+            }.toSet()
         }
-        if ("fin de semana" in text || "fines de semana" in text) {
-            return setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
-        }
-        return dayNames.mapNotNull { (day, names) ->
-            day.takeIf { Regex("\\b(?:$names)\\b").containsMatchIn(text) }
+        val excluded = dayNames.mapNotNull { (day, names) ->
+            day.takeIf { Regex("\\bexcepto\\s+(?:el\\s+)?(?:$names)\\b").containsMatchIn(text) }
         }.toSet()
+        return base - excluded
+    }
+
+    private fun extractWeekInterval(text: String): Int {
+        val raw = Regex("\\bcada\\s+(dos|tres|cuatro|\\d+)\\s+semanas?\\b")
+            .find(text)?.groupValues?.get(1) ?: return 1
+        return when (raw) {
+            "dos" -> 2
+            "tres" -> 3
+            "cuatro" -> 4
+            else -> raw.toIntOrNull()?.coerceIn(1, 12) ?: 1
+        }
     }
 
     private fun extractTarget(text: String): Pair<Int, HabitUnit>? {
@@ -150,6 +168,8 @@ object SmartCaptureParser {
             .replace(Regex("(?i)\\b(?:(?:por la|cada)\\s+(?:mañana|manana|tarde|noche))\\b"), "")
             .replace(Regex("(?i)\\b(?:pasado\\s+mañana|pasado\\s+manana|hoy|mañana|manana|importante|urgente|prioridad alta|tarea|hábito|habito|rutina|diario|diaria)\\b"), "")
             .replace(Regex("(?i)\\b(?:todos los días|todos los dias|cada día|cada dia|entre semana|fines? de semana|(?:de\\s+)?lunes\\s+a\\s+viernes)\\b"), "")
+            .replace(Regex("(?i)\\bcada\\s+(?:dos|tres|cuatro|\\d+)\\s+semanas?\\b"), "")
+            .replace(Regex("(?i)\\bexcepto\\s+(?:el\\s+)?(?:lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\\b"), "")
             .replace(Regex("(?i)\\b(?:(?:cada|los|el)\\s+)?(?:lunes|lun|martes|mar|miércoles|miercoles|mie|jueves|jue|viernes|vie|sábado|sabado|sab|domingo|dom)\\b"), "")
             .replace(Regex("(?i)\\b(?:a\\s+las?|alas)\\s*\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?\\b"), "")
             .replace(Regex("(?i)\\b\\d{1,2}:\\d{2}\\s*(?:am|pm)?\\b"), "")

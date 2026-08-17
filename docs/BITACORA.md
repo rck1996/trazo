@@ -177,3 +177,13 @@ Se añadió el sexto widget, Captura inteligente. Su micrófono abre el reconoce
 ### 18. Captura confirmable y checkpoint — versión 3.2
 
 La captura por voz del widget ahora presenta una revisión breve antes de guardar: muestra si se detectó tarea o hábito, fecha, hora y días. La persona puede cancelar o confirmar; nunca se almacena el audio original. El checkpoint Git `7a49f0b` conserva toda la versión 3.1.0 antes de esta iteración.
+
+## 19. Ritmo adaptable — versión 3.3
+
+- Los hábitos guardan intervalos de 1 a 12 semanas y excepciones por fecha. El editor ofrece frecuencias comunes y el calendario permite omitir o restaurar una aparición concreta.
+- El intérprete entiende `cada dos semanas` y reglas como `todos los días excepto domingo`.
+- Hoy incluye una revisión diaria/semanal local con tareas completadas, atrasos, cumplimiento de rituales, minutos de enfoque y una sugerencia accionable.
+- El Pomodoro conserva enfoque, pausa corta, pausa larga, cantidad de ciclos y avance automático. El servicio puede alternar fases aun con la aplicación en segundo plano.
+- Los widgets grandes admiten etiqueta, solo atrasadas, privacidad completa/discreta y estilo ilustrado/minimalista por instancia.
+- Ajustes incorpora una vista minimalista general: reduce movimiento y elimina ilustraciones decorativas manteniendo las imágenes funcionales del Pomodoro.
+- Los estados vacíos ahora usan ilustraciones sketch contextuales; con modo minimalista vuelven a una presentación tipográfica.

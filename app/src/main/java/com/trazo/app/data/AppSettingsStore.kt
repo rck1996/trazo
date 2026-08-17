@@ -8,7 +8,8 @@ data class AppSettings(
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val largeText: Boolean = false,
     val reducedMotion: Boolean = false,
-    val haptics: Boolean = true
+    val haptics: Boolean = true,
+    val minimalMode: Boolean = false
 )
 
 class AppSettingsStore(context: Context) {
@@ -20,7 +21,8 @@ class AppSettingsStore(context: Context) {
         }.getOrDefault(ThemePreference.SYSTEM),
         largeText = preferences.getBoolean("large_text", false),
         reducedMotion = preferences.getBoolean("reduced_motion", false),
-        haptics = preferences.getBoolean("haptics", true)
+        haptics = preferences.getBoolean("haptics", true),
+        minimalMode = preferences.getBoolean("minimal_mode", false)
     )
 
     fun save(settings: AppSettings) {
@@ -29,6 +31,7 @@ class AppSettingsStore(context: Context) {
             .putBoolean("large_text", settings.largeText)
             .putBoolean("reduced_motion", settings.reducedMotion)
             .putBoolean("haptics", settings.haptics)
+            .putBoolean("minimal_mode", settings.minimalMode)
             .apply()
     }
 }

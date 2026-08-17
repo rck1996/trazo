@@ -33,6 +33,7 @@ private val DarkPalette = TrazoPalette(
 private val LocalTrazoPalette = staticCompositionLocalOf { LightPalette }
 val LocalReducedMotion = staticCompositionLocalOf { false }
 val LocalTrazoHaptics = staticCompositionLocalOf { true }
+val LocalMinimalMode = staticCompositionLocalOf { false }
 
 val Paper: Color @Composable get() = LocalTrazoPalette.current.paper
 val PaperRaised: Color @Composable get() = LocalTrazoPalette.current.raised
@@ -66,8 +67,9 @@ fun TrazoTheme(settings: AppSettings = AppSettings(), content: @Composable () ->
     val scaledDensity = Density(density.density, if (settings.largeText) density.fontScale * 1.15f else density.fontScale)
     CompositionLocalProvider(
         LocalTrazoPalette provides palette,
-        LocalReducedMotion provides settings.reducedMotion,
+        LocalReducedMotion provides (settings.reducedMotion || settings.minimalMode),
         LocalTrazoHaptics provides settings.haptics,
+        LocalMinimalMode provides settings.minimalMode,
         LocalDensity provides scaledDensity
     ) {
         MaterialTheme(

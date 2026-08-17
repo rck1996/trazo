@@ -29,6 +29,7 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +61,7 @@ private val EsLocale = Locale.forLanguageTag("es-CL")
 internal fun CalendarScreen(
     tasks: List<Task>, habits: List<Habit>, padding: PaddingValues,
     onTaskToggle: (String) -> Unit, onHabitToggle: (String, LocalDate) -> Unit,
+    onHabitExceptionToggle: (String, LocalDate) -> Unit,
     onAddTask: (LocalDate) -> Unit
 ) {
     var mode by remember { mutableStateOf(CalendarMode.PLANNER) }
@@ -90,7 +92,7 @@ internal fun CalendarScreen(
             label = "calendar mode"
         ) { currentMode ->
             when (currentMode) {
-                CalendarMode.DAY -> DayAgenda(selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle, onAddTask)
+                CalendarMode.DAY -> DayAgenda(selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle, onHabitExceptionToggle, onAddTask)
                 CalendarMode.PLANNER -> WeekPlanner(selectedDate, tasks, habits, padding, onTaskToggle) {
                     selectedDate = it
                     visibleMonth = YearMonth.from(it)
@@ -152,10 +154,11 @@ private fun ModeSelector(selected: CalendarMode, onSelect: (CalendarMode) -> Uni
 private fun DayAgenda(
     date: LocalDate, tasks: List<Task>, habits: List<Habit>, padding: PaddingValues,
     onTaskToggle: (String) -> Unit, onHabitToggle: (String, LocalDate) -> Unit,
+    onHabitExceptionToggle: (String, LocalDate) -> Unit,
     onAddTask: (LocalDate) -> Unit
 ) {
     val dayTasks = TaskSchedule.onDate(tasks, date).sortedBy { it.completed }
-    val dayHabits = habits.filter { HabitProgress.isScheduled(it, date) }
+    val dayHabits = habits.filter { HabitProgress.isBaseScheduled(it, date) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -173,7 +176,7 @@ private fun DayAgenda(
         items(dayTasks, key = { it.id }) { task -> CalendarTaskRow(task, onTaskToggle) }
         item { AgendaLabel("Hábitos", dayHabits.count { HabitProgress.isComplete(it, date) }, dayHabits.size) }
         if (dayHabits.isEmpty()) item { CalendarEmpty("Sin rituales programados", "Este día puede respirar.") }
-        items(dayHabits, key = { it.id }) { habit -> CalendarHabitRow(habit, date, onHabitToggle) }
+        items(dayHabits, key = { it.id }) { habit -> CalendarHabitRow(habit, date, onHabitToggle, onHabitExceptionToggle) }
     }
 }
 
@@ -204,17 +207,28 @@ private fun CalendarTaskRow(task: Task, onToggle: (String) -> Unit) {
 }
 
 @Composable
-private fun CalendarHabitRow(habit: Habit, date: LocalDate, onToggle: (String, LocalDate) -> Unit) {
+private fun CalendarHabitRow(
+    habit: Habit,
+    date: LocalDate,
+    onToggle: (String, LocalDate) -> Unit,
+    onExceptionToggle: (String, LocalDate) -> Unit
+) {
     val done = HabitProgress.isComplete(habit, date)
+    val skipped = date in habit.skippedDates
     Surface(
         color = if (done) Sky.copy(alpha = .20f) else PaperRaised,
         shape = RoundedCornerShape(13.dp),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp).fillMaxWidth()
     ) {
-        Row(Modifier.clickable { onToggle(habit.id, date) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(habit.emoji, fontSize = 22.sp)
             Text(habit.title, modifier = Modifier.weight(1f).padding(horizontal = 12.dp), fontWeight = FontWeight.SemiBold)
-            Text(if (done) "Hecho ✓" else "Marcar", color = if (done) Leaf else Coral, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { if (skipped) onExceptionToggle(habit.id, date) else onToggle(habit.id, date) }) {
+                Text(if (skipped) "Restaurar" else if (done) "Hecho ✓" else "Marcar", color = if (done) Leaf else Coral, fontWeight = FontWeight.Bold)
+            }
+            TextButton(onClick = { onExceptionToggle(habit.id, date) }) {
+                Text(if (skipped) "Omitido" else "Omitir", color = MutedInk, fontSize = 11.sp)
+            }
         }
     }
 }

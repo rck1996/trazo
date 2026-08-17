@@ -24,6 +24,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,6 +81,10 @@ private fun WidgetConfigurationScreen(initial: WidgetConfig, onSave: (WidgetConf
     var focusMinutes by remember { mutableStateOf(initial.focusMinutes) }
     var palette by remember { mutableStateOf(initial.palette) }
     var maxItems by remember { mutableStateOf(initial.maxItems) }
+    var tagFilter by remember { mutableStateOf(initial.tagFilter) }
+    var overdueOnly by remember { mutableStateOf(initial.overdueOnly) }
+    var privacy by remember { mutableStateOf(initial.privacy) }
+    var style by remember { mutableStateOf(initial.style) }
 
     Column(
         Modifier.fillMaxSize().background(Paper).verticalScroll(rememberScrollState())
@@ -116,6 +121,30 @@ private fun WidgetConfigurationScreen(initial: WidgetConfig, onSave: (WidgetConf
         ConfigCard("Cantidad máxima") {
             ChoiceRow(listOf(2 to "2", 4 to "4", 6 to "6"), maxItems) { maxItems = it }
         }
+        ConfigCard("Filtro personal") {
+            OutlinedTextField(
+                value = tagFilter,
+                onValueChange = { tagFilter = it.take(24) },
+                label = { Text("Etiqueta, por ejemplo trabajo") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            CheckLine("Solo tareas atrasadas", overdueOnly) { overdueOnly = it }
+        }
+        ConfigCard("Privacidad") {
+            ChoiceRow(
+                listOf(WidgetPrivacy.FULL to "Completo", WidgetPrivacy.DISCREET to "Discreto"),
+                privacy,
+                onSelect = { privacy = it }
+            )
+        }
+        ConfigCard("Estilo visual") {
+            ChoiceRow(
+                listOf(WidgetStyle.ARTISTIC to "Ilustrado", WidgetStyle.MINIMAL to "Minimal"),
+                style,
+                onSelect = { style = it }
+            )
+        }
         ConfigCard("Tinta principal") {
             ChoiceRow(
                 listOf(
@@ -130,7 +159,11 @@ private fun WidgetConfigurationScreen(initial: WidgetConfig, onSave: (WidgetConf
         Spacer(Modifier.height(2.dp))
         Button(
             onClick = {
-                onSave(WidgetConfig(first, showTasks, showHabits, focusMinutes, palette, maxItems))
+                onSave(WidgetConfig(
+                    firstSection = first, showTasks = showTasks, showHabits = showHabits,
+                    focusMinutes = focusMinutes, palette = palette, maxItems = maxItems,
+                    tagFilter = tagFilter, overdueOnly = overdueOnly, privacy = privacy, style = style
+                ))
             },
             colors = ButtonDefaults.buttonColors(containerColor = Coral),
             shape = RoundedCornerShape(16.dp),

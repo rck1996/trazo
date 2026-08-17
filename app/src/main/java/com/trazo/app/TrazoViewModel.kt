@@ -34,6 +34,8 @@ data class HabitInput(
     val emoji: String = "✦",
     val category: HabitCategory = HabitCategory.GENERAL,
     val days: Set<DayOfWeek> = DayOfWeek.entries.toSet(),
+    val repeatEveryWeeks: Int = 1,
+    val skippedDates: Set<LocalDate> = emptySet(),
     val target: Int = 1,
     val unit: HabitUnit = HabitUnit.CHECK,
     val reminderHour: Int? = null,
@@ -116,6 +118,8 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
         update { state -> state.copy(habits = state.habits + Habit(
             title = input.title.trim(), emoji = input.emoji.ifBlank { input.category.symbol }.take(2),
             category = input.category, activeDays = input.days,
+            repeatEveryWeeks = input.repeatEveryWeeks.coerceIn(1, 12),
+            skippedDates = input.skippedDates,
             target = input.target.coerceAtLeast(1), unit = input.unit,
             reminderHour = input.reminderHour, reminderMinute = input.reminderMinute,
             tags = input.tags.cleanTags()
@@ -138,6 +142,14 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
         })
     }
 
+    fun toggleHabitException(id: String, date: LocalDate) = update { state ->
+        state.copy(habits = state.habits.map { habit ->
+            if (habit.id != id) habit else habit.copy(
+                skippedDates = if (date in habit.skippedDates) habit.skippedDates - date else habit.skippedDates + date
+            )
+        })
+    }
+
     fun deleteHabit(id: String) {
         update { state -> state.copy(habits = state.habits.map {
             if (it.id == id) it.copy(deletedAt = System.currentTimeMillis()) else it
@@ -151,6 +163,8 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
             if (it.id == id) it.copy(
                 title = input.title.trim(), emoji = input.emoji.ifBlank { input.category.symbol }.take(2),
                 category = input.category, activeDays = input.days,
+                repeatEveryWeeks = input.repeatEveryWeeks.coerceIn(1, 12),
+                skippedDates = input.skippedDates,
                 target = input.target.coerceAtLeast(1), unit = input.unit,
                 reminderHour = input.reminderHour, reminderMinute = input.reminderMinute,
                 tags = input.tags.cleanTags()

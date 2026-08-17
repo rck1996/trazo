@@ -43,7 +43,7 @@ class LocalStore(private val context: Context) {
     }
 
     private fun encode(state: TrazoState) = JSONObject().apply {
-        put("version", 4)
+        put("version", 5)
         put("tasks", JSONArray().apply {
             state.tasks.forEach { task ->
                 put(JSONObject().apply {
@@ -71,6 +71,8 @@ class LocalStore(private val context: Context) {
                     put("emoji", habit.emoji)
                     put("category", habit.category.name)
                     put("activeDays", JSONArray(habit.activeDays.map { it.value }))
+                    put("repeatEveryWeeks", habit.repeatEveryWeeks)
+                    put("skippedDates", JSONArray(habit.skippedDates.map { it.toString() }))
                     put("completions", JSONArray(habit.completions.map { it.toString() }))
                     put("progress", JSONObject().apply {
                         habit.progress.forEach { (date, amount) -> put(date.toString(), amount) }
@@ -130,6 +132,7 @@ class LocalStore(private val context: Context) {
                         put(LocalDate.parse(date), progressJson.getInt(date))
                     }
                 }
+                val skippedDates = item.optJSONArray("skippedDates").toDateSet()
                 add(Habit(
                     id = item.getString("id"),
                     title = item.getString("title"),
@@ -138,6 +141,8 @@ class LocalStore(private val context: Context) {
                         HabitCategory.valueOf(item.optString("category"))
                     }.getOrElse { HabitCategory.infer(item.getString("title")) },
                     activeDays = days,
+                    repeatEveryWeeks = item.optInt("repeatEveryWeeks", 1).coerceIn(1, 12),
+                    skippedDates = skippedDates,
                     completions = completions,
                     progress = progress,
                     target = item.optInt("target", 1).coerceAtLeast(1),
@@ -160,6 +165,14 @@ class LocalStore(private val context: Context) {
     private fun JSONArray?.toStringSet(): Set<String> = buildSet {
         if (this@toStringSet != null) {
             for (index in 0 until length()) add(getString(index))
+        }
+    }
+
+    private fun JSONArray?.toDateSet(): Set<LocalDate> = buildSet {
+        if (this@toDateSet != null) {
+            for (index in 0 until length()) {
+                runCatching { LocalDate.parse(getString(index)) }.getOrNull()?.let(::add)
+            }
         }
     }
 }

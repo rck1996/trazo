@@ -60,6 +60,8 @@ data class Habit(
     val emoji: String = "✦",
     val category: HabitCategory = HabitCategory.GENERAL,
     val activeDays: Set<DayOfWeek> = DayOfWeek.entries.toSet(),
+    val repeatEveryWeeks: Int = 1,
+    val skippedDates: Set<LocalDate> = emptySet(),
     val completions: Set<LocalDate> = emptySet(),
     val progress: Map<LocalDate, Int> = emptyMap(),
     val target: Int = 1,
@@ -78,8 +80,16 @@ data class TrazoState(
 )
 
 object HabitProgress {
+    fun isBaseScheduled(habit: Habit, date: LocalDate): Boolean =
+        date >= habit.createdOn &&
+            date.dayOfWeek in habit.activeDays &&
+            (java.time.temporal.ChronoUnit.WEEKS.between(
+                habit.createdOn.with(DayOfWeek.MONDAY),
+                date.with(DayOfWeek.MONDAY)
+            ) % habit.repeatEveryWeeks.coerceAtLeast(1) == 0L)
+
     fun isScheduled(habit: Habit, date: LocalDate): Boolean =
-        date >= habit.createdOn && date.dayOfWeek in habit.activeDays
+        isBaseScheduled(habit, date) && date !in habit.skippedDates
 
     fun streak(habit: Habit, today: LocalDate = LocalDate.now()): Int {
         if (habit.activeDays.isEmpty()) return 0

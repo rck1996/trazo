@@ -44,13 +44,15 @@ class TrazoCollectionService : RemoteViewsService() {
             tasks = state.tasks
                 .filter { !it.completed && !it.archived && it.deletedAt == null &&
                     (it.dueDate == null || !it.dueDate.isAfter(today)) }
+                .filter { config.tagFilter.isBlank() || config.tagFilter in it.tags }
+                .filter { !config.overdueOnly || it.dueDate?.isBefore(today) == true }
                 .sortedWith(
                     compareByDescending<Task> { it.priority == TaskPriority.IMPORTANT }
                         .thenBy { it.dueDate ?: LocalDate.MAX }
                 ).take(maxItems)
             habits = state.habits.filter {
                 !it.archived && it.deletedAt == null && HabitProgress.isScheduled(it, today)
-            }.take(maxItems)
+            }.filter { config.tagFilter.isBlank() || config.tagFilter in it.tags }.take(maxItems)
             val minHeight = android.appwidget.AppWidgetManager.getInstance(context)
                 .getAppWidgetOptions(widgetId)
                 .getInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 300)
@@ -98,10 +100,12 @@ class TrazoCollectionService : RemoteViewsService() {
         private fun taskView(position: Int): RemoteViews? {
             val task = tasks.getOrNull(position) ?: return null
             return RemoteViews(context.packageName, R.layout.widget_task_stack_item).apply {
+                val config = WidgetPreferences.load(context, widgetId)
+                setViewVisibility(R.id.widget_task_item_image, if (config.style == WidgetStyle.MINIMAL) android.view.View.GONE else android.view.View.VISIBLE)
                 if (Build.VERSION.SDK_INT >= 31) itemHeightDp?.let {
                     setViewLayoutHeight(R.id.widget_task_item, it.toFloat(), TypedValue.COMPLEX_UNIT_DIP)
                 }
-                setTextViewText(R.id.widget_task_item_title, task.title)
+                setTextViewText(R.id.widget_task_item_title, if (config.privacy == WidgetPrivacy.DISCREET) "Tarea privada" else task.title)
                 setTextViewText(
                     R.id.widget_task_item_mark,
                     "${position + 1}/${tasks.size} · " +
@@ -109,7 +113,8 @@ class TrazoCollectionService : RemoteViewsService() {
                 )
                 setTextViewText(
                     R.id.widget_task_item_meta,
-                    task.note.ifBlank { "Toca ✓ cuando esté listo" }
+                    if (config.privacy == WidgetPrivacy.DISCREET) "Toca ✓ cuando esté listo"
+                    else task.note.ifBlank { "Toca ✓ cuando esté listo" }
                 )
                 setContentDescription(R.id.widget_task_item_complete, "Completar ${task.title}")
                 val open = Intent()
@@ -131,11 +136,14 @@ class TrazoCollectionService : RemoteViewsService() {
             val isDone = HabitProgress.isComplete(habit, today)
             val streak = HabitProgress.streak(habit, today)
             return RemoteViews(context.packageName, R.layout.widget_habit_stack_item).apply {
+                val config = WidgetPreferences.load(context, widgetId)
+                setViewVisibility(R.id.widget_habit_item_image, if (config.style == WidgetStyle.MINIMAL) android.view.View.GONE else android.view.View.VISIBLE)
                 if (Build.VERSION.SDK_INT >= 31) itemHeightDp?.let {
                     setViewLayoutHeight(R.id.widget_habit_item, it.toFloat(), TypedValue.COMPLEX_UNIT_DIP)
                 }
                 setImageViewResource(R.id.widget_habit_item_image, habitIllustration(habit))
-                setTextViewText(R.id.widget_habit_item_title, "${habit.emoji}  ${habit.title}")
+                setTextViewText(R.id.widget_habit_item_title,
+                    if (config.privacy == WidgetPrivacy.DISCREET) "${habit.emoji}  Ritual privado" else "${habit.emoji}  ${habit.title}")
                 setTextViewText(
                     R.id.widget_habit_item_meta,
                     when {

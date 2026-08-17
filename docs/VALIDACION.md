@@ -177,3 +177,13 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 
 - La actividad de captura por voz compila con confirmación previa para tarea o hábito y cierre seguro al cancelar.
 - El checkpoint previo está guardado en Git como `7a49f0b`.
+
+## Validación de la versión 3.3.0
+
+- Se añadieron pruebas para recurrencia quincenal, excepciones de calendario, revisión diaria y nuevas frases del intérprete.
+- El almacenamiento subió a versión 5 conservando valores predeterminados para copias anteriores.
+- La configuración de cada widget se mantiene aislada por identificador y los filtros no modifican los datos originales.
+- El pase final `lintDebug testDebugUnitTest assembleRelease assembleDebug` terminó con `BUILD SUCCESSFUL`: 22 pruebas, 0 fallos y 0 errores de Lint.
+- La revisión visual a 1080 × 2340 comprobó la tarjeta de revisión en Hoy, el modo Enfoque con ilustración y ciclo automático, y Ajustes con texto ampliado sin desbordes.
+- `Trazo-3.3.0-debug.apk` se instaló incrementalmente con `Success`; Android confirmó `versionCode=19`, `versionName=3.3.0` y un arranque correcto en 346 ms.
+- El búfer de crashes permaneció vacío y el APK compartible se copió a `/sdcard/Download/Trazo-3.3.0.apk`.

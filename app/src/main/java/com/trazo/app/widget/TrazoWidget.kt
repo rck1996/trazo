@@ -149,19 +149,21 @@ class TrazoWidget : AppWidgetProvider() {
         private fun createViews(context: Context, widgetId: Int): RemoteViews {
             val today = LocalDate.now()
             val state = LocalStore(context).load()
+            val config = WidgetPreferences.load(context, widgetId)
             val pendingTasks = state.tasks
                 .filter { !it.completed && !it.archived && it.deletedAt == null &&
                     (it.dueDate == null || !it.dueDate.isAfter(today)) }
+                .filter { config.tagFilter.isBlank() || config.tagFilter in it.tags }
+                .filter { !config.overdueOnly || it.dueDate?.isBefore(today) == true }
                 .sortedWith(
                     compareByDescending<Task> { it.priority == TaskPriority.IMPORTANT }
                         .thenBy { it.dueDate ?: LocalDate.MAX }
                 )
             val scheduledHabits = state.habits.filter {
                 !it.archived && it.deletedAt == null && HabitProgress.isScheduled(it, today)
-            }
+            }.filter { config.tagFilter.isBlank() || config.tagFilter in it.tags }
             val habitsDone = scheduledHabits.count { HabitProgress.isComplete(it, today) }
             val focusSession = FocusSessionStore.load(context)
-            val config = WidgetPreferences.load(context, widgetId)
             val minHeight = AppWidgetManager.getInstance(context)
                 .getAppWidgetOptions(widgetId)
                 .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 300)
@@ -221,7 +223,8 @@ class TrazoWidget : AppWidgetProvider() {
                         WidgetPalette.INK -> R.drawable.widget_button_ink
                     }
                 )
-                setViewVisibility(R.id.widget_rhythm, if (compact) View.GONE else View.VISIBLE)
+                setViewVisibility(R.id.widget_rhythm, if (compact || config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
+                setViewVisibility(R.id.widget_greeting, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
                 setViewVisibility(R.id.widget_task_label, if (showTasks) View.VISIBLE else View.GONE)
                 setViewVisibility(R.id.widget_task_region, if (showTasks) View.VISIBLE else View.GONE)
                 setViewVisibility(R.id.widget_habit_label, if (showHabits) View.VISIBLE else View.GONE)

@@ -10,3 +10,4 @@ app/build/
 .tooling/
 .kotlin/
 .codex-remote-attachments/
+graphify-out/

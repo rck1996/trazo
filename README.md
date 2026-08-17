@@ -61,12 +61,12 @@ Desde Android Studio o con el Gradle Wrapper incluido:
 ./gradlew assembleDebug
 ```
 
-El APK instalable más reciente también se copia a `artifacts/Trazo-3.3.3-debug.apk`.
+El APK instalable más reciente también se copia a `artifacts/Trazo-3.3.4-debug.apk`.
 
 Para instalarlo por USB con el teléfono autorizado:
 
 ```powershell
-adb install -r -t artifacts\Trazo-3.3.3-debug.apk
+adb install -r -t artifacts\Trazo-3.3.4-debug.apk
 ```
 
 Las pruebas unitarias cubren el cálculo de rachas, incluidos días no programados y días omitidos.

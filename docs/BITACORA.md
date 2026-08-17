@@ -212,3 +212,9 @@ El grosor, las terminaciones redondeadas y la escala son comunes. En el estilo a
 Se eliminó la sección combinada que hacía parecer equivalentes ambas acciones. Ajustes presenta ahora dos destinos independientes: Archivadas conserva íntegramente los elementos ocultos de las listas, mientras Papelera contiene los borrados y permite restaurarlos o eliminarlos definitivamente.
 
 Archivar informa el destino mediante Snackbar y ofrece Deshacer. Eliminar habla explícitamente de mover a Papelera antes de actuar. El borrado permanente muestra una segunda confirmación con el nombre del elemento y advierte que no se puede deshacer.
+
+## 23. Notificaciones coherentes — versión 3.3.4
+
+El guardado local compara el estado anterior y el nuevo antes de reconciliar recordatorios. Al archivar, completar, enviar a Papelera o borrar definitivamente una tarea o hábito, se cancelan tanto su alarma pendiente como cualquier notificación ya visible, sin esperar a que Android la retire.
+
+La misma política protege los recordatorios que llegan al mismo tiempo que una edición: una tarea archivada o un hábito archivado/completado ya no puede volver a publicar una notificación obsoleta. Los widgets continúan actualizándose desde la misma operación de guardado.

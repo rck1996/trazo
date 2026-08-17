@@ -218,3 +218,11 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - Archivar dispone de Deshacer y el borrado irreversible exige confirmación nominal.
 - `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 26 pruebas, 0 fallos y 0 errores de Lint.
 - El APK corresponde a `versionCode=22`, `versionName=3.3.3`.
+
+## Validación de la versión 3.3.4
+
+- Se añadieron cinco pruebas de política de recordatorios para tareas y hábitos activos, completados, archivados y enviados a Papelera.
+- `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 31 pruebas, 0 fallos y 0 errores de Lint.
+- La sincronización posterior al guardado cancela alarmas pendientes y notificaciones ya visibles; una segunda lectura evita que un aviso obsoleto reaparezca durante una edición concurrente.
+- El APK se instaló con `Success` en el teléfono conectado. Android confirmó `versionCode=23`, `versionName=3.3.4`; también se copió a `/sdcard/Download/Trazo-3.3.4.apk`.
+- Según lo acordado, no se abrió ni se manipuló la interfaz: la comprobación funcional en el teléfono queda a cargo del usuario.

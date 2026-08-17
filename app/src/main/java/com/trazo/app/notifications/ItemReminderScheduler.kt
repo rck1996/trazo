@@ -1,6 +1,7 @@
 package com.trazo.app.notifications
 
 import android.app.AlarmManager
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,7 +10,9 @@ import androidx.core.app.NotificationCompat
 import com.trazo.app.MainActivity
 import com.trazo.app.R
 import com.trazo.app.data.LocalStore
+import com.trazo.app.model.Habit
 import com.trazo.app.model.HabitProgress
+import com.trazo.app.model.Task
 import com.trazo.app.model.TrazoState
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -28,9 +31,7 @@ object ItemReminderScheduler {
         }
         val scheduled = mutableSetOf<String>()
         val now = LocalDateTime.now()
-        state.tasks.filter {
-            !it.completed && !it.archived && it.deletedAt == null && it.dueDate != null && it.reminderHour != null
-        }.forEach { task ->
+        state.tasks.filter(Task::hasActiveReminder).forEach { task ->
             val at = LocalDateTime.of(task.dueDate, LocalTime.of(task.reminderHour!!, task.reminderMinute))
             if (at.isAfter(now)) {
                 schedule(context, manager, "task", task.id, at)
@@ -43,7 +44,7 @@ object ItemReminderScheduler {
             var date = LocalDate.now()
             repeat(8) {
                 val at = LocalDateTime.of(date, LocalTime.of(habit.reminderHour!!, habit.reminderMinute))
-                if (date.dayOfWeek in habit.activeDays && at.isAfter(now) && !HabitProgress.isComplete(habit, date)) {
+                if (habit.hasActiveReminderOn(date) && at.isAfter(now)) {
                     schedule(context, manager, "habit", habit.id, at)
                     scheduled += "habit:${habit.id}"
                     return@forEach
@@ -53,6 +54,28 @@ object ItemReminderScheduler {
         }
         prefs.edit().putStringSet("ids", scheduled).apply()
     }
+
+    /** Alarm cancellation alone does not dismiss a notification posted earlier. */
+    fun syncAfterSave(context: Context, previous: TrazoState, current: TrazoState) {
+        scheduleAll(context, current)
+        val currentTaskIds = current.tasks.mapTo(mutableSetOf()) { it.id }
+        val currentHabitIds = current.habits.mapTo(mutableSetOf()) { it.id }
+        val removedIds = buildSet {
+            previous.tasks.filterNot { it.id in currentTaskIds }.forEach { add(it.id) }
+            previous.habits.filterNot { it.id in currentHabitIds }.forEach { add(it.id) }
+        }
+        val inactiveIds = buildSet {
+            current.tasks.filterNot(Task::hasActiveReminder).forEach { add(it.id) }
+            current.habits.filterNot { it.hasActiveReminderOn(LocalDate.now()) }.forEach { add(it.id) }
+        }
+        (removedIds + inactiveIds).forEach { cancelNotification(context, it) }
+    }
+
+    fun cancelNotification(context: Context, id: String) {
+        context.getSystemService(NotificationManager::class.java).cancel(notificationId(id))
+    }
+
+    internal fun notificationId(id: String) = 7400 + id.hashCode().and(0x3fff)
 
     fun snooze(context: Context, kind: String, id: String) {
         val manager = context.getSystemService(AlarmManager::class.java)
@@ -94,7 +117,7 @@ class ItemReminderReceiver : BroadcastReceiver() {
             ACTION_COMPLETE -> complete(context, kind, id)
             ACTION_SNOOZE -> {
                 ItemReminderScheduler.snooze(context, kind, id)
-                context.getSystemService(android.app.NotificationManager::class.java).cancel(notificationId(id))
+                ItemReminderScheduler.cancelNotification(context, id)
             }
             else -> post(context, kind, id)
         }
@@ -103,11 +126,20 @@ class ItemReminderReceiver : BroadcastReceiver() {
     private fun post(context: Context, kind: String, id: String) {
         NotificationCenter.createChannels(context)
         val state = LocalStore(context).load()
-        val title = if (kind == "task") {
-            state.tasks.firstOrNull { it.id == id && !it.completed && !it.archived && it.deletedAt == null }?.title
+        val item = if (kind == "task") {
+            state.tasks.firstOrNull { it.id == id && it.hasActiveReminder() }
         } else {
-            state.habits.firstOrNull { it.id == id && it.deletedAt == null }?.title
-        } ?: return
+            state.habits.firstOrNull { it.id == id && it.hasActiveReminderOn(LocalDate.now()) }
+        }
+        val title = when (item) {
+            is Task -> item.title
+            is Habit -> item.title
+            else -> {
+                ItemReminderScheduler.cancelNotification(context, id)
+                ItemReminderScheduler.scheduleAll(context, state)
+                return
+            }
+        }
         val open = PendingIntent.getActivity(
             context,
             id.hashCode(),
@@ -126,8 +158,15 @@ class ItemReminderReceiver : BroadcastReceiver() {
             .addAction(0, "Hecho", complete)
             .addAction(0, "Posponer 10 min", snooze)
             .build()
-        NotificationCenter.post(context, notificationId(id), notification)
-        ItemReminderScheduler.scheduleAll(context, state)
+        NotificationCenter.post(context, ItemReminderScheduler.notificationId(id), notification)
+        val latest = LocalStore(context).load()
+        val stillActive = if (kind == "task") {
+            latest.tasks.any { it.id == id && it.hasActiveReminder() }
+        } else {
+            latest.habits.any { it.id == id && it.hasActiveReminderOn(LocalDate.now()) }
+        }
+        if (!stillActive) ItemReminderScheduler.cancelNotification(context, id)
+        ItemReminderScheduler.scheduleAll(context, latest)
     }
 
     private fun complete(context: Context, kind: String, id: String) {
@@ -144,7 +183,7 @@ class ItemReminderReceiver : BroadcastReceiver() {
             })
         }
         store.save(updated)
-        context.getSystemService(android.app.NotificationManager::class.java).cancel(notificationId(id))
+        ItemReminderScheduler.cancelNotification(context, id)
     }
 
     private fun actionIntent(context: Context, action: String, kind: String, id: String) =
@@ -156,8 +195,6 @@ class ItemReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-    private fun notificationId(id: String) = 7400 + id.hashCode().and(0x3fff)
-
     companion object {
         const val ACTION_ALARM = "com.trazo.app.ITEM_REMINDER"
         const val ACTION_COMPLETE = "com.trazo.app.ITEM_COMPLETE"
@@ -166,3 +203,10 @@ class ItemReminderReceiver : BroadcastReceiver() {
         const val EXTRA_ID = "item_id"
     }
 }
+
+internal fun Task.hasActiveReminder(): Boolean =
+    !completed && !archived && deletedAt == null && dueDate != null && reminderHour != null
+
+internal fun Habit.hasActiveReminderOn(date: LocalDate): Boolean =
+    !archived && deletedAt == null && reminderHour != null &&
+        HabitProgress.isScheduled(this, date) && !HabitProgress.isComplete(this, date)

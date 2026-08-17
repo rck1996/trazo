@@ -25,8 +25,9 @@ class LocalStore(private val context: Context) {
     }.getOrDefault(TrazoState())
 
     fun save(state: TrazoState) {
+        val previous = load()
         preferences.edit { putString(KEY_STATE, encode(state).toString()) }
-        ItemReminderScheduler.scheduleAll(context, state)
+        ItemReminderScheduler.syncAfterSave(context, previous, state)
         TrazoWidget.updateAll(context)
     }
 

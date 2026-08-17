@@ -1,6 +1,17 @@
 # Trazo
 
+[![Android CI](https://github.com/rck1996/trazo/actions/workflows/android-ci.yml/badge.svg)](https://github.com/rck1996/trazo/actions/workflows/android-ci.yml)
+[![Última versión](https://img.shields.io/github/v/release/rck1996/trazo?label=versi%C3%B3n)](https://github.com/rck1996/trazo/releases/latest)
+[![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3f7356)](https://developer.android.com/about/versions/oreo)
+[![Offline](https://img.shields.io/badge/datos-100%25%20local-d95f4b)](#privacidad)
+
 Trazo es una aplicación Android offline para gestionar tareas y hábitos sin cuentas, anuncios ni conexión. Su interfaz mezcla un cuaderno de papel con trazos imperfectos, colores cálidos y microinteracciones discretas.
+
+## Descargar e instalar
+
+Descarga el APK desde la [última versión publicada](https://github.com/rck1996/trazo/releases/latest). En Android, permite temporalmente la instalación desde la aplicación con la que abras el archivo y toca el APK para instalarlo.
+
+> Los APK actuales son compilaciones de prueba firmadas localmente y pensadas para instalación directa. No son paquetes de Google Play.
 
 ## Funciones incluidas
 
@@ -52,6 +63,10 @@ UI Compose → TrazoViewModel → LocalStore → SharedPreferences / JSON
 
 No se añadieron cuentas, red, analítica, inyección de dependencias ni base de datos: el tamaño actual no los justifica. `LocalStore` mantiene un campo de versión para permitir migraciones y copias portables.
 
+## Privacidad
+
+Trazo no crea cuentas, no contiene analítica y no envía tareas, hábitos, grabaciones ni estadísticas a servidores. La captura por voz usa el reconocedor configurado en Android y la aplicación conserva únicamente el texto confirmado. Las copias de seguridad solo se crean cuando la persona las exporta mediante el selector de archivos del sistema.
+
 ## Verificación
 
 Desde Android Studio o con el Gradle Wrapper incluido:
@@ -70,6 +85,14 @@ adb install -r -t artifacts\Trazo-3.3.4-debug.apk
 ```
 
 Las pruebas unitarias cubren el cálculo de rachas, incluidos días no programados y días omitidos.
+
+## CI/CD
+
+- Cada push o pull request hacia `main` ejecuta pruebas unitarias, Android Lint y la compilación del APK; los reportes y el APK quedan como artefactos temporales de GitHub Actions.
+- Dependabot revisa semanalmente las dependencias de Gradle y de GitHub Actions.
+- Una etiqueta semántica como `v3.3.4` valida que versión, código y APK coincidan, vuelve a ejecutar las comprobaciones y publica automáticamente el APK junto con su checksum SHA-256.
+
+Para preparar una versión nueva, actualiza `versionCode` y `versionName`, genera `artifacts/Trazo-X.Y.Z-debug.apk`, confirma los cambios y crea la etiqueta `vX.Y.Z`.
 
 Consulta [docs/BITACORA.md](docs/BITACORA.md) para ver el desarrollo y las decisiones paso a paso.
 

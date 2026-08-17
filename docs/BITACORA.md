@@ -173,3 +173,7 @@ El intérprete dejó de depender únicamente de “hoy”, “mañana” y “to
 - La categoría inferida asigna también su icono; spinning, bicicleta y ciclismo entran en Movimiento.
 
 Se añadió el sexto widget, Captura inteligente. Su micrófono abre el reconocedor de Android, interpreta el resultado y guarda directamente la tarea o hábito; el widget muestra un mensaje de confirmación con el resultado. Tocar el resto de la tarjeta abre Trazo. `RemoteViews` no admite campos editables, por lo que la voz es la interacción directa y la captura dentro de la app conserva la revisión previa.
+
+### 18. Captura confirmable y checkpoint — versión 3.2
+
+La captura por voz del widget ahora presenta una revisión breve antes de guardar: muestra si se detectó tarea o hábito, fecha, hora y días. La persona puede cancelar o confirmar; nunca se almacena el audio original. El checkpoint Git `7a49f0b` conserva toda la versión 3.1.0 antes de esta iteración.

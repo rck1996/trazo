@@ -172,3 +172,8 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - El dictado del widget no conserva audio: recibe únicamente la transcripción devuelta por el reconocedor configurado en Android.
 - El pase final `lintDebug testDebugUnitTest assembleRelease assembleDebug` terminó con `BUILD SUCCESSFUL`: 18 pruebas, 0 fallos y 0 errores de Lint.
 - `Trazo-3.1.0-debug.apk` se instaló incrementalmente con `Success`; Android confirmó `versionCode=16`, `versionName=3.1.0`, arranque correcto en 393 ms y búfer de fallos vacío.
+
+## Validación de la versión 3.2.0
+
+- La actividad de captura por voz compila con confirmación previa para tarea o hábito y cierre seguro al cancelar.
+- El checkpoint previo está guardado en Git como `7a49f0b`.

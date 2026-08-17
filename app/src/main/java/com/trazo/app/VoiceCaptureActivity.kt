@@ -1,6 +1,7 @@
 package com.trazo.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognizerIntent
@@ -40,7 +41,33 @@ class VoiceCaptureActivity : ComponentActivity() {
     private fun savePhrase(phrase: String) {
         val store = LocalStore(this)
         val state = store.load()
-        when (val result = SmartCaptureParser.parse(phrase)) {
+        val result = SmartCaptureParser.parse(phrase)
+        val preview = when (result) {
+            is SmartCaptureResult.TaskDraft -> {
+                val input = result.input
+                buildString {
+                    append("Tarea: ${input.title}")
+                    input.dueDate?.let { append("\\nFecha: $it") }
+                    input.reminderHour?.let { append("\\nHora: %02d:%02d".format(it, input.reminderMinute)) }
+                }
+            }
+            is SmartCaptureResult.HabitDraft -> {
+                val input = result.input
+                val days = input.days.sortedBy { it.value }.joinToString("·") { dayLabels.getValue(it) }
+                "Hábito: ${input.title}\\nDías: $days"
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Revisar captura")
+            .setMessage(preview)
+            .setNegativeButton("Cancelar") { _, _ -> finish() }
+            .setPositiveButton("Guardar") { _, _ -> persistResult(result, store, state) }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    private fun persistResult(result: SmartCaptureResult, store: LocalStore, state: com.trazo.app.model.TrazoState) {
+        when (result) {
             is SmartCaptureResult.TaskDraft -> {
                 val input = result.input
                 store.save(state.copy(tasks = listOf(Task(
@@ -67,18 +94,18 @@ class VoiceCaptureActivity : ComponentActivity() {
                     reminderMinute = input.reminderMinute,
                     tags = input.tags
                 )))
-                val dayLabels = mapOf(
-                    DayOfWeek.MONDAY to "L",
-                    DayOfWeek.TUESDAY to "M",
-                    DayOfWeek.WEDNESDAY to "X",
-                    DayOfWeek.THURSDAY to "J",
-                    DayOfWeek.FRIDAY to "V",
-                    DayOfWeek.SATURDAY to "S",
-                    DayOfWeek.SUNDAY to "D"
-                )
                 val days = input.days.sortedBy { it.value }.joinToString("·") { dayLabels.getValue(it) }
                 Toast.makeText(this, "Hábito guardado: ${input.title} · $days", Toast.LENGTH_LONG).show()
             }
         }
+        finish()
+    }
+
+    private companion object {
+        val dayLabels = mapOf(
+            DayOfWeek.MONDAY to "L", DayOfWeek.TUESDAY to "M", DayOfWeek.WEDNESDAY to "X",
+            DayOfWeek.THURSDAY to "J", DayOfWeek.FRIDAY to "V", DayOfWeek.SATURDAY to "S",
+            DayOfWeek.SUNDAY to "D"
+        )
     }
 }

@@ -187,3 +187,5 @@ La captura por voz del widget ahora presenta una revisión breve antes de guarda
 - Los widgets grandes admiten etiqueta, solo atrasadas, privacidad completa/discreta y estilo ilustrado/minimalista por instancia.
 - Ajustes incorpora una vista minimalista general: reduce movimiento y elimina ilustraciones decorativas manteniendo las imágenes funcionales del Pomodoro.
 - Los estados vacíos ahora usan ilustraciones sketch contextuales; con modo minimalista vuelven a una presentación tipográfica.
+- La auditoría posterior completó los puntos visuales: Hoy cambia entre ilustraciones IA de mañana, tarde y noche; el encabezado respira suavemente, las listas animan altas/bajas y el check de ritual se dibuja progresivamente. Todo respeta Movimiento reducido y la vista minimalista.
+- Las sugerencias combinan atrasos, cumplimiento, tareas terminadas y minutos de enfoque. El editor de hábitos permite elegir intervalos de 1 a 12 semanas y omitir fechas con calendario, sin exigir formato ISO.

@@ -208,7 +208,7 @@ class TrazoWidget : AppWidgetProvider() {
                 setInt(
                     R.id.widget_root,
                     "setBackgroundResource",
-                    when (config.palette) {
+                    if (config.style == WidgetStyle.MINIMAL) R.drawable.widget_paper_minimal else when (config.palette) {
                         WidgetPalette.CORAL -> R.drawable.widget_paper
                         WidgetPalette.BOTANICAL -> R.drawable.widget_paper_botanical
                         WidgetPalette.INK -> R.drawable.widget_paper_ink
@@ -225,6 +225,9 @@ class TrazoWidget : AppWidgetProvider() {
                 )
                 setViewVisibility(R.id.widget_rhythm, if (compact || config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
                 setViewVisibility(R.id.widget_greeting, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
+                setViewVisibility(R.id.widget_header_art, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
+                setViewVisibility(R.id.widget_task_empty_art, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
+                setViewVisibility(R.id.widget_habit_empty_art, if (config.style == WidgetStyle.MINIMAL) View.GONE else View.VISIBLE)
                 setViewVisibility(R.id.widget_task_label, if (showTasks) View.VISIBLE else View.GONE)
                 setViewVisibility(R.id.widget_task_region, if (showTasks) View.VISIBLE else View.GONE)
                 setViewVisibility(R.id.widget_habit_label, if (showHabits) View.VISIBLE else View.GONE)

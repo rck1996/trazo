@@ -9,3 +9,4 @@ captures/
 app/build/
 .tooling/
 .kotlin/
+.codex-remote-attachments/

@@ -187,3 +187,8 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - La revisión visual a 1080 × 2340 comprobó la tarjeta de revisión en Hoy, el modo Enfoque con ilustración y ciclo automático, y Ajustes con texto ampliado sin desbordes.
 - `Trazo-3.3.0-debug.apk` se instaló incrementalmente con `Success`; Android confirmó `versionCode=19`, `versionName=3.3.0` y un arranque correcto en 346 ms.
 - El búfer de crashes permaneció vacío y el APK compartible se copió a `/sdcard/Download/Trazo-3.3.0.apk`.
+- Corrección posterior: las barras normal y siempre activa representan avance transcurrido (vacía al inicio y llena al terminar), se limitan a 0–100 % y se validan con casos de restauración inválida. La foto física reveló además una discordancia cuando había un tiempo personalizado: el reloj nacía fijo en 25:00 y la barra usaba el valor guardado; ahora ambos nacen del mismo ajuste.
+- Una segunda auditoría contrastó individualmente los puntos 3, 4, 5, 6, 7, 10, 18, 19 y 20. Se completaron el selector de recurrencia de 1–12 semanas, las excepciones mediante calendario, sugerencias con minutos de enfoque, tres artes contextuales por horario y microanimaciones de finalización.
+- El estilo minimalista del widget usa ahora una superficie propia y oculta todas sus imágenes decorativas. La privacidad discreta también neutraliza emoji, prioridad, racha, metadatos y descripciones de accesibilidad.
+- El pase posterior `testDebugUnitTest lintDebug assembleRelease assembleDebug` terminó con `BUILD SUCCESSFUL`: 25 pruebas, 0 fallos y 0 errores de Lint.
+- El APK actualizado se instaló incrementalmente con `Success`; la inspección física confirmó que la barra comienza dentro de su pista y el arranque cálido terminó en 283 ms.

@@ -37,4 +37,10 @@ class ReviewInsightsTest {
         assertEquals(1, summary.habitOpportunities)
         assertEquals(0, summary.habitsDone)
     }
+
+    @Test fun suggestionUsesFocusWithoutSendingDataAnywhere() {
+        val summary = ReviewInsights.daily(emptyList(), emptyList(), LocalDate.of(2026, 8, 17), focusMinutes = 95)
+        assertTrue(summary.suggestion.contains("95 minutos"))
+        assertTrue(summary.suggestion.contains("pausa"))
+    }
 }

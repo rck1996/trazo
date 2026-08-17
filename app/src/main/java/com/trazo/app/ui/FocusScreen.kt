@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -59,6 +60,11 @@ internal enum class FocusPhase { FOCUS, BREAK }
 internal fun nextFocusPhase(phase: FocusPhase): FocusPhase =
     if (phase == FocusPhase.FOCUS) FocusPhase.BREAK else FocusPhase.FOCUS
 
+internal fun elapsedTimerProgress(remaining: Int, total: Int): Float {
+    if (total <= 0) return 0f
+    return (1f - remaining.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+}
+
 @Composable
 internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComplete: (String) -> Unit) {
     val context = LocalContext.current
@@ -76,7 +82,11 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
     }
     var phaseName by rememberSaveable { mutableStateOf(restoredSession?.phase ?: FocusPhase.FOCUS.name) }
     var remaining by rememberSaveable {
-        mutableIntStateOf(((restoredSession?.endAt?.minus(System.currentTimeMillis()) ?: 1_500_000L) / 1000L).toInt().coerceAtLeast(1))
+        mutableIntStateOf(
+            restoredSession?.let {
+                ((it.endAt - System.currentTimeMillis() + 999L) / 1000L).toInt().coerceAtLeast(1)
+            } ?: (storedPreferences.focusMinutes * 60)
+        )
     }
     var running by rememberSaveable { mutableStateOf(restoredSession != null) }
     var targetEpoch by rememberSaveable { mutableLongStateOf(restoredSession?.endAt ?: 0L) }
@@ -344,7 +354,11 @@ private fun AmbientFocusMode(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     modifier = Modifier.widthIn(max = 280.dp).padding(top = 8.dp)
                 )
-                val progress = if (total <= 0) 0f else remaining.toFloat() / total
+                val progress by animateFloatAsState(
+                    targetValue = elapsedTimerProgress(remaining, total),
+                    animationSpec = tween(if (LocalReducedMotion.current) 0 else 350),
+                    label = "ambient timer progress"
+                )
                 Canvas(Modifier.padding(top = 28.dp).width(220.dp).height(8.dp)) {
                     drawLine(Color.White.copy(alpha = .08f), Offset(0f, center.y), Offset(size.width, center.y), 4.dp.toPx(), StrokeCap.Round)
                     drawLine(
@@ -393,19 +407,23 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
     val motionEnabled = !LocalReducedMotion.current && !LocalMinimalMode.current
     val progressTrack = Ink.copy(alpha = .12f)
     val progressColor = if (phase == FocusPhase.FOCUS) Coral else Leaf
-    val progress = if (total == 0) 0f else remaining.toFloat() / total
+    val progress by animateFloatAsState(
+        targetValue = elapsedTimerProgress(remaining, total),
+        animationSpec = tween(if (motionEnabled) 350 else 0),
+        label = "timer progress"
+    )
     val pop = remember { Animatable(1f) }
     val tilt = remember { Animatable(0f) }
     val livingMotion = rememberInfiniteTransition(label = "focus illustration")
     val breathe by livingMotion.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.025f,
+        initialValue = .985f,
+        targetValue = 1.045f,
         animationSpec = infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "gentle breathing"
     )
     val sway by livingMotion.animateFloat(
-        initialValue = -0.7f,
-        targetValue = 0.7f,
+        initialValue = -1.5f,
+        targetValue = 1.5f,
         animationSpec = infiniteRepeatable(tween(2100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "hand drawn sway"
     )

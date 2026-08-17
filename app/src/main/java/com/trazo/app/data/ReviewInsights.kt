@@ -16,16 +16,20 @@ data class ReviewSummary(
 )
 
 object ReviewInsights {
-    fun daily(tasks: List<Task>, habits: List<Habit>, date: LocalDate = LocalDate.now()): ReviewSummary {
+    fun daily(
+        tasks: List<Task>, habits: List<Habit>, date: LocalDate = LocalDate.now(), focusMinutes: Int = 0
+    ): ReviewSummary {
         val activeTasks = tasks.filter { !it.archived && it.deletedAt == null }
         val completed = activeTasks.count { it.completedAt?.toLocalDate() == date }
         val overdue = activeTasks.count { !it.completed && it.dueDate?.isBefore(date) == true }
         val scheduled = habits.filter { !it.archived && it.deletedAt == null && HabitProgress.isScheduled(it, date) }
         val done = scheduled.count { HabitProgress.isComplete(it, date) }
-        return ReviewSummary(completed, overdue, done, scheduled.size, suggestion(overdue, done, scheduled.size))
+        return ReviewSummary(completed, overdue, done, scheduled.size, suggestion(completed, overdue, done, scheduled.size, focusMinutes, weekly = false))
     }
 
-    fun weekly(tasks: List<Task>, habits: List<Habit>, end: LocalDate = LocalDate.now()): ReviewSummary {
+    fun weekly(
+        tasks: List<Task>, habits: List<Habit>, end: LocalDate = LocalDate.now(), focusMinutes: Int = 0
+    ): ReviewSummary {
         val start = end.minusDays(6)
         val activeTasks = tasks.filter { !it.archived && it.deletedAt == null }
         val completed = activeTasks.count { task -> task.completedAt?.toLocalDate()?.let { it in start..end } == true }
@@ -38,13 +42,18 @@ object ReviewInsights {
                 if (HabitProgress.isComplete(habit, date)) done++
             }
         }
-        return ReviewSummary(completed, overdue, done, opportunities, suggestion(overdue, done, opportunities))
+        return ReviewSummary(completed, overdue, done, opportunities, suggestion(completed, overdue, done, opportunities, focusMinutes, weekly = true))
     }
 
-    private fun suggestion(overdue: Int, done: Int, total: Int): String = when {
+    private fun suggestion(
+        completed: Int, overdue: Int, done: Int, total: Int, focusMinutes: Int, weekly: Boolean
+    ): String = when {
         overdue >= 3 -> "Hay $overdue tareas atrasadas. Reprograma, divide o archiva las que ya no importan."
         total >= 4 && done * 2 < total -> "Reduce un ritual o cambia su horario: la constancia mejora cuando el plan respira."
         total > 0 && done == total -> "Tus rituales están al día. Protege este ritmo sin agregar más por obligación."
+        focusMinutes >= if (weekly) 300 else 90 -> "Ya acumulaste $focusMinutes minutos de enfoque. Una pausa real también protege tu ritmo."
+        completed == 0 && focusMinutes > 0 -> "Ya enfocaste $focusMinutes minutos. Cierra una tarea pequeña para convertir ese esfuerzo en avance visible."
+        completed == 0 && focusMinutes == 0 -> "Elige un trazo de menos de diez minutos o inicia un bloque corto de enfoque."
         else -> "Elige un siguiente trazo pequeño y reserva un bloque de enfoque para terminarlo."
     }
 

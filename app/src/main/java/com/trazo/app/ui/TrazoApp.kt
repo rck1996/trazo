@@ -15,6 +15,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.spring
@@ -128,6 +133,7 @@ import com.trazo.app.data.ThemePreference
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -310,6 +316,21 @@ private fun PageHeader(
     onOpenSettings: (() -> Unit)? = null
 ) {
     val minimalMode = LocalMinimalMode.current
+    val reducedMotion = LocalReducedMotion.current
+    val hour = remember { LocalTime.now().hour }
+    val contextualIllustration = when {
+        onOpenSettings == null -> R.drawable.header_ai_notebook
+        hour < 12 -> R.drawable.context_ai_morning
+        hour < 19 -> R.drawable.context_ai_afternoon
+        else -> R.drawable.context_ai_evening
+    }
+    val artMotion = rememberInfiniteTransition(label = "contextual header art")
+    val artScale by artMotion.animateFloat(
+        initialValue = 1f,
+        targetValue = if (reducedMotion) 1f else 1.035f,
+        animationSpec = infiniteRepeatable(tween(2100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "contextual art breathing"
+    )
     Box(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 24.dp, vertical = 16.dp)) {
         Column(Modifier.padding(end = if (minimalMode && onOpenSettings == null) 0.dp else 72.dp)) {
             Text(eyebrow.uppercase(Locale.forLanguageTag("es-CL")), color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
@@ -325,10 +346,10 @@ private fun PageHeader(
                 )
         ) {
             if (!minimalMode) Image(
-                painter = painterResource(R.drawable.header_ai_notebook),
+                painter = painterResource(contextualIllustration),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(72.dp).align(Alignment.TopCenter).rotate(-5f)
+                modifier = Modifier.size(76.dp).align(Alignment.TopCenter).rotate(-4f).scale(artScale)
             )
             if (onOpenSettings != null) {
                 Box(
@@ -377,24 +398,25 @@ private fun TodayScreen(
         item {
             ProgressNote(done, total)
             QuickActions({ showCapture = true }, onOpenPlanner, onOpenFocus)
+            val periodFocusMinutes = if (weeklyReview) viewModel.focusStats().weekMinutes else viewModel.focusStats().todayMinutes
             ReviewCard(
-                if (weeklyReview) ReviewInsights.weekly(tasks, habits, today)
-                else ReviewInsights.daily(tasks, habits, today),
+                if (weeklyReview) ReviewInsights.weekly(tasks, habits, today, periodFocusMinutes)
+                else ReviewInsights.daily(tasks, habits, today, periodFocusMinutes),
                 weeklyReview,
                 onTogglePeriod = { weeklyReview = !weeklyReview },
-                focusMinutes = if (weeklyReview) viewModel.focusStats().weekMinutes else viewModel.focusStats().todayMinutes,
+                focusMinutes = periodFocusMinutes,
                 onOpenPlanner = onOpenPlanner
             )
             SectionTitle("Siguiente trazo", "solo lo que importa ahora")
         }
         if (pending.isEmpty()) item { EmptyNote("Tu lista respira", "Anota una tarea pequeña para empezar.", onAddTask, R.drawable.widget_ai_task) }
         items(pending.take(4), key = { it.id }) { task ->
-            TaskCard(task, onTaskToggle, null)
+            Box(Modifier.animateItem()) { TaskCard(task, onTaskToggle, null) }
         }
         item { SectionTitle("Rituales de hoy", "la constancia también cuenta") }
         if (dueHabits.isEmpty()) item { EmptyNote("Sin rituales hoy", "Crea uno que se sienta tuyo.", onAddHabit, R.drawable.widget_ai_ritual) }
         items(dueHabits, key = { it.id }) { habit ->
-            HabitCard(habit, onHabitToggle, null)
+            Box(Modifier.animateItem()) { HabitCard(habit, onHabitToggle, null) }
         }
     }
     if (showSettings) {
@@ -1032,8 +1054,14 @@ private fun HabitCard(
     val checked = HabitProgress.isComplete(habit, today)
     val amount = HabitProgress.amount(habit, today)
     val streak = HabitProgress.streak(habit, today)
+    val reducedMotion = LocalReducedMotion.current
+    val cardColor by animateColorAsState(
+        if (checked) Sky.copy(alpha = .24f) else PaperRaised,
+        tween(if (reducedMotion) 0 else 320),
+        label = "habit completion color"
+    )
     Surface(
-        color = if (checked) Sky.copy(alpha = .20f) else PaperRaised,
+        color = cardColor,
         shape = RoundedCornerShape(18.dp, 10.dp, 16.dp, 8.dp),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp).fillMaxWidth().sketchBorder(Sky)
     ) {
@@ -1118,17 +1146,29 @@ private fun ArchiveButton(label: String, onArchive: () -> Unit) {
 private fun SketchCheck(checked: Boolean, onClick: () -> Unit) {
     val checkColor = Leaf
     val emptyColor = Ink.copy(alpha = .45f)
+    val reducedMotion = LocalReducedMotion.current
+    val reveal by animateFloatAsState(
+        if (checked) 1f else 0f,
+        if (reducedMotion) tween(0) else spring(dampingRatio = .48f, stiffness = 520f),
+        label = "ritual check reveal"
+    )
     Box(
-        Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onClick).semantics {
+        Modifier.size(48.dp).scale(1f + reveal * .10f).clip(CircleShape).clickable(onClick = onClick).semantics {
             role = Role.Checkbox
             contentDescription = if (checked) "Marcar como no realizado" else "Marcar como realizado"
         }, contentAlignment = Alignment.Center
     ) {
         Canvas(Modifier.size(30.dp)) {
-            drawCircle(if (checked) checkColor else emptyColor, style = Stroke(2.dp.toPx()))
-            if (checked) {
-                drawLine(checkColor, Offset(size.width * .22f, size.height * .52f), Offset(size.width * .43f, size.height * .72f), 3.dp.toPx(), StrokeCap.Round)
-                drawLine(checkColor, Offset(size.width * .43f, size.height * .72f), Offset(size.width * .79f, size.height * .28f), 3.dp.toPx(), StrokeCap.Round)
+            drawCircle(if (reveal > 0f) checkColor else emptyColor, style = Stroke(2.dp.toPx()))
+            if (reveal > 0f) {
+                val firstStart = Offset(size.width * .22f, size.height * .52f)
+                val firstEnd = Offset(size.width * .22f + size.width * .21f * reveal, size.height * .52f + size.height * .20f * reveal)
+                val secondStart = Offset(size.width * .43f, size.height * .72f)
+                val secondEnd = Offset(size.width * .43f + size.width * .36f * reveal, size.height * .72f - size.height * .44f * reveal)
+                drawLine(checkColor, firstStart, firstEnd, 3.dp.toPx(), StrokeCap.Round)
+                drawLine(checkColor, secondStart, secondEnd, 3.dp.toPx(), StrokeCap.Round)
+                drawLine(checkColor.copy(alpha = reveal * .55f), Offset(size.width * .08f, size.height * .20f), Offset(size.width * .02f, size.height * .09f), 1.5.dp.toPx(), StrokeCap.Round)
+                drawLine(checkColor.copy(alpha = reveal * .55f), Offset(size.width * .83f, size.height * .17f), Offset(size.width * .91f, size.height * .07f), 1.5.dp.toPx(), StrokeCap.Round)
             }
         }
     }
@@ -1305,9 +1345,8 @@ private fun HabitComposer(
     var category by remember(habit, draft) { mutableStateOf(habit?.category ?: draft?.category ?: HabitCategory.GENERAL) }
     var days by remember(habit, draft) { mutableStateOf(habit?.activeDays ?: draft?.days ?: DayOfWeek.entries.toSet()) }
     var repeatEveryWeeks by remember(habit, draft) { mutableIntStateOf(habit?.repeatEveryWeeks ?: draft?.repeatEveryWeeks ?: 1) }
-    var exceptionText by remember(habit, draft) {
-        mutableStateOf((habit?.skippedDates ?: draft?.skippedDates.orEmpty()).sorted().joinToString(", "))
-    }
+    var skippedDates by remember(habit, draft) { mutableStateOf(habit?.skippedDates ?: draft?.skippedDates.orEmpty()) }
+    var showExceptionPicker by remember { mutableStateOf(false) }
     var target by remember(habit, draft) { mutableIntStateOf(habit?.target ?: draft?.target ?: 1) }
     var unit by remember(habit, draft) { mutableStateOf(habit?.unit ?: draft?.unit ?: HabitUnit.CHECK) }
     var reminderHour by remember(habit, draft) { mutableStateOf(habit?.reminderHour ?: draft?.reminderHour) }
@@ -1379,27 +1418,32 @@ private fun HabitComposer(
                 }
             }
             Text("Frecuencia", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 7.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(1 to "Cada semana", 2 to "Cada 2", 3 to "Cada 3", 4 to "Cada 4").forEach { (weeks, label) ->
-                    Surface(
-                        onClick = { repeatEveryWeeks = weeks },
-                        color = if (repeatEveryWeeks == weeks) Leaf else Ink.copy(alpha = .05f),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(label, color = if (repeatEveryWeeks == weeks) Color.White else MutedInk, fontSize = 10.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(vertical = 9.dp))
+            Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { repeatEveryWeeks = (repeatEveryWeeks - 1).coerceAtLeast(1) }) { Text("−", fontSize = 20.sp, color = MutedInk) }
+                    Text(
+                        if (repeatEveryWeeks == 1) "Cada semana" else "Cada $repeatEveryWeeks semanas",
+                        modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontWeight = FontWeight.Bold, color = Ink
+                    )
+                    TextButton(onClick = { repeatEveryWeeks = (repeatEveryWeeks + 1).coerceAtMost(12) }) { Text("+", fontSize = 20.sp, color = Leaf) }
+                }
+            }
+            Text("Excepciones", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 3.dp))
+            Text("Omite días concretos sin romper la recurrencia.", color = MutedInk, fontSize = 12.sp)
+            if (skippedDates.isNotEmpty()) Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                skippedDates.sorted().forEach { date ->
+                    Surface(onClick = { skippedDates = skippedDates - date }, color = Lavender.copy(alpha = .16f), shape = RoundedCornerShape(10.dp)) {
+                        Text(date.format(DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("es-CL"))) + "  ×", color = Ink, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp))
                     }
                 }
             }
-            OutlinedTextField(
-                exceptionText,
-                { exceptionText = it },
-                label = { Text("Fechas omitidas") },
-                supportingText = { Text("Opcional: 2026-08-20, 2026-09-03") },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                maxLines = 2
-            )
+            TextButton(onClick = { showExceptionPicker = true }, contentPadding = PaddingValues(top = 5.dp)) {
+                Text("+ Omitir una fecha", color = Coral, fontWeight = FontWeight.Bold)
+            }
             Text("Recordatorio", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 listOf(null, 8, 12, 18, 21).forEach { hour ->
@@ -1413,7 +1457,7 @@ private fun HabitComposer(
                 onSave(HabitInput(
                     title = title, emoji = emoji, category = category, days = days,
                     repeatEveryWeeks = repeatEveryWeeks,
-                    skippedDates = parseExceptionDates(exceptionText),
+                    skippedDates = skippedDates,
                     target = target, unit = unit,
                     reminderHour = reminderHour, reminderMinute = reminderMinute,
                     tags = parseTags(tags)
@@ -1421,15 +1465,26 @@ private fun HabitComposer(
             }
         }
     }
+    if (showExceptionPicker) {
+        val exceptionPickerState = rememberDatePickerState(
+            initialSelectedDateMillis = LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showExceptionPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    exceptionPickerState.selectedDateMillis?.let {
+                        skippedDates = (skippedDates + Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()).take(32).toSet()
+                    }
+                    showExceptionPicker = false
+                }) { Text("Omitir fecha", color = Coral) }
+            },
+            dismissButton = { TextButton(onClick = { showExceptionPicker = false }) { Text("Cancelar") } }
+        ) { DatePicker(exceptionPickerState) }
+    }
 }
 
 private fun parseTags(value: String): Set<String> = value.split(',', ' ').mapNotNull { it.trim().removePrefix("#").lowercase().takeIf(String::isNotBlank) }.take(8).toSet()
-
-private fun parseExceptionDates(value: String): Set<LocalDate> = value
-    .split(',', ';', ' ')
-    .mapNotNull { runCatching { LocalDate.parse(it.trim()) }.getOrNull() }
-    .take(32)
-    .toSet()
 
 private fun parseReminder(value: String): Pair<Int, Int>? {
     val parts = value.split(':')

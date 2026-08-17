@@ -109,14 +109,16 @@ class TrazoCollectionService : RemoteViewsService() {
                 setTextViewText(
                     R.id.widget_task_item_mark,
                     "${position + 1}/${tasks.size} · " +
-                        if (task.priority == TaskPriority.IMPORTANT) "★ IMPORTANTE" else "PRÓXIMO TRAZO"
+                        if (config.privacy == WidgetPrivacy.DISCREET) "PRIVADO"
+                        else if (task.priority == TaskPriority.IMPORTANT) "★ IMPORTANTE" else "PRÓXIMO TRAZO"
                 )
                 setTextViewText(
                     R.id.widget_task_item_meta,
                     if (config.privacy == WidgetPrivacy.DISCREET) "Toca ✓ cuando esté listo"
                     else task.note.ifBlank { "Toca ✓ cuando esté listo" }
                 )
-                setContentDescription(R.id.widget_task_item_complete, "Completar ${task.title}")
+                setContentDescription(R.id.widget_task_item_complete,
+                    if (config.privacy == WidgetPrivacy.DISCREET) "Completar tarea privada" else "Completar ${task.title}")
                 val open = Intent()
                     .putExtra(TrazoWidget.EXTRA_COLLECTION_COMMAND, TrazoWidget.COMMAND_OPEN_TASKS)
                 setOnClickFillInIntent(R.id.widget_task_item_image, open)
@@ -143,10 +145,11 @@ class TrazoCollectionService : RemoteViewsService() {
                 }
                 setImageViewResource(R.id.widget_habit_item_image, habitIllustration(habit))
                 setTextViewText(R.id.widget_habit_item_title,
-                    if (config.privacy == WidgetPrivacy.DISCREET) "${habit.emoji}  Ritual privado" else "${habit.emoji}  ${habit.title}")
+                    if (config.privacy == WidgetPrivacy.DISCREET) "Ritual privado" else "${habit.emoji}  ${habit.title}")
                 setTextViewText(
                     R.id.widget_habit_item_meta,
-                    when {
+                    if (config.privacy == WidgetPrivacy.DISCREET) "Toca ✓ para cambiar el estado"
+                    else when {
                         isDone -> "${position + 1}/${habits.size} · COMPLETADO"
                         habit.target > 1 -> "${HabitProgress.amount(habit, today)}/${habit.target} ${habit.unit.shortLabel}"
                         streak == 0 -> "${position + 1}/${habits.size} · empieza tu racha"
@@ -156,7 +159,9 @@ class TrazoCollectionService : RemoteViewsService() {
                 setTextViewText(R.id.widget_habit_item_check, if (isDone) "↶" else "✓")
                 setContentDescription(
                     R.id.widget_habit_item_check,
-                    if (isDone) "Desmarcar ${habit.title}" else "Completar ${habit.title}"
+                    if (config.privacy == WidgetPrivacy.DISCREET) {
+                        if (isDone) "Desmarcar ritual privado" else "Completar ritual privado"
+                    } else if (isDone) "Desmarcar ${habit.title}" else "Completar ${habit.title}"
                 )
                 val open = Intent()
                     .putExtra(TrazoWidget.EXTRA_COLLECTION_COMMAND, TrazoWidget.COMMAND_OPEN_HABITS)

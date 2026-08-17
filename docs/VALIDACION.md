@@ -226,3 +226,9 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - La sincronización posterior al guardado cancela alarmas pendientes y notificaciones ya visibles; una segunda lectura evita que un aviso obsoleto reaparezca durante una edición concurrente.
 - El APK se instaló con `Success` en el teléfono conectado. Android confirmó `versionCode=23`, `versionName=3.3.4`; también se copió a `/sdcard/Download/Trazo-3.3.4.apk`.
 - Según lo acordado, no se abrió ni se manipuló la interfaz: la comprobación funcional en el teléfono queda a cargo del usuario.
+
+## Validación de publicación GitHub
+
+- El primer runner detectó que API 37 no estaba disponible en el canal estable de `sdkmanager`; la configuración reproducible se alineó con API 36 y con las últimas líneas compatibles de Core y Lifecycle.
+- El pase local posterior `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 31 pruebas, 0 fallos y 0 errores de Lint.
+- Los tres archivos YAML de GitHub se validaron sintácticamente y el APK 3.3.4 se regeneró desde la misma fuente que se publicará.

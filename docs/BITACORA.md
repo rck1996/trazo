@@ -218,3 +218,7 @@ Archivar informa el destino mediante Snackbar y ofrece Deshacer. Eliminar habla 
 El guardado local compara el estado anterior y el nuevo antes de reconciliar recordatorios. Al archivar, completar, enviar a Papelera o borrar definitivamente una tarea o hábito, se cancelan tanto su alarma pendiente como cualquier notificación ya visible, sin esperar a que Android la retire.
 
 La misma política protege los recordatorios que llegan al mismo tiempo que una edición: una tarea archivada o un hábito archivado/completado ya no puede volver a publicar una notificación obsoleta. Los widgets continúan actualizándose desde la misma operación de guardado.
+
+## 24. Publicación y automatización
+
+El repositorio público incorpora CI para pruebas, Lint y APK en cada cambio a `main`, Dependabot semanal para Gradle y Actions, y CD por etiquetas semánticas con checksum SHA-256. El SDK de compilación se fija en API 36 estable: API 37 solo estaba disponible en la instalación preview local y no podía reproducirse desde el repositorio público de `sdkmanager`.

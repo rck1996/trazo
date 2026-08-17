@@ -20,8 +20,11 @@ import java.time.DayOfWeek
 class VoiceCaptureActivity : ComponentActivity() {
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val phrase = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        if (result.resultCode == Activity.RESULT_OK && !phrase.isNullOrBlank()) savePhrase(phrase)
-        finish()
+        if (result.resultCode == Activity.RESULT_OK && !phrase.isNullOrBlank()) {
+            savePhrase(phrase)
+        } else {
+            finish()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,14 +50,14 @@ class VoiceCaptureActivity : ComponentActivity() {
                 val input = result.input
                 buildString {
                     append("Tarea: ${input.title}")
-                    input.dueDate?.let { append("\\nFecha: $it") }
-                    input.reminderHour?.let { append("\\nHora: %02d:%02d".format(it, input.reminderMinute)) }
+                    input.dueDate?.let { append("\nFecha: $it") }
+                    input.reminderHour?.let { append("\nHora: %02d:%02d".format(it, input.reminderMinute)) }
                 }
             }
             is SmartCaptureResult.HabitDraft -> {
                 val input = result.input
                 val days = input.days.sortedBy { it.value }.joinToString("·") { dayLabels.getValue(it) }
-                "Hábito: ${input.title}\\nDías: $days"
+                "Hábito: ${input.title}\nDías: $days"
             }
         }
         AlertDialog.Builder(this)

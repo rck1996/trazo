@@ -210,3 +210,11 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - El nuevo componente contiene veinte símbolos trazados, semántica accesible cuando funciona como control y una variante limpia automática para el modo minimalista.
 - `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 26 pruebas, 0 fallos y 0 errores de Lint.
 - El APK corresponde a `versionCode=21`, `versionName=3.3.2`; la validación visual en el teléfono queda a cargo del usuario según lo acordado.
+
+## Validación de la versión 3.3.3
+
+- Archivadas y Papelera usan encabezados, superficies, explicaciones e iconos distintos.
+- Los elementos archivados solo ofrecen Restaurar; cada elemento de Papelera ofrece Restaurar o Eliminar para siempre dentro de su propia tarjeta.
+- Archivar dispone de Deshacer y el borrado irreversible exige confirmación nominal.
+- `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 26 pruebas, 0 fallos y 0 errores de Lint.
+- El APK corresponde a `versionCode=22`, `versionName=3.3.3`.

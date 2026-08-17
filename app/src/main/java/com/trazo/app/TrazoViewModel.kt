@@ -172,12 +172,18 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
         }) }
     }
 
-    fun archiveTask(id: String) = update { state -> state.copy(tasks = state.tasks.map {
-        if (it.id == id) it.copy(archived = true) else it
-    }) }
-    fun archiveHabit(id: String) = update { state -> state.copy(habits = state.habits.map {
-        if (it.id == id) it.copy(archived = true) else it
-    }) }
+    fun archiveTask(id: String) {
+        update { state -> state.copy(tasks = state.tasks.map {
+            if (it.id == id) it.copy(archived = true) else it
+        }) }
+        _undoAction.value = UndoAction("task", id, "Tarea movida a Archivadas")
+    }
+    fun archiveHabit(id: String) {
+        update { state -> state.copy(habits = state.habits.map {
+            if (it.id == id) it.copy(archived = true) else it
+        }) }
+        _undoAction.value = UndoAction("habit", id, "Hábito movido a Archivadas")
+    }
     fun restoreTask(id: String) = update { state -> state.copy(tasks = state.tasks.map {
         if (it.id == id) it.copy(archived = false, deletedAt = null) else it
     }) }

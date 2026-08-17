@@ -705,16 +705,27 @@ private fun SettingsSheet(
                     StatCell(stats.minutes.toString(), "minutos")
                 }
             }
-            Text("ARCHIVO Y PAPELERA", color = Sky, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
+            Text("ARCHIVADAS", color = Sky, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
-                    if (archivedTasks.isEmpty() && archivedHabits.isEmpty() && deletedTasks.isEmpty() && deletedHabits.isEmpty()) Text("Archivo y papelera vacíos", color = MutedInk)
+                    Text("Se conservan completas, pero dejan de aparecer en tus listas.", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+                    if (archivedTasks.isEmpty() && archivedHabits.isEmpty()) Text("No hay elementos archivados", color = MutedInk)
                     (archivedTasks.map { Triple(it.id, it.title, "task") } + archivedHabits.map { Triple(it.id, it.title, "habit") }).forEach { (id, title, kind) ->
-                        LibraryRow("Archivado · $title", "Restaurar") { if (kind == "task") viewModel.restoreTask(id) else viewModel.restoreHabit(id) }
+                        LibraryRow(title, "Restaurar", TrazoIconKind.ARCHIVE) { if (kind == "task") viewModel.restoreTask(id) else viewModel.restoreHabit(id) }
                     }
+                }
+            }
+            Text("PAPELERA", color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 8.dp))
+            Surface(color = Coral.copy(alpha = .08f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("Aquí quedan los elementos borrados hasta que decidas restaurarlos o eliminarlos para siempre.", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+                    if (deletedTasks.isEmpty() && deletedHabits.isEmpty()) Text("La papelera está vacía", color = MutedInk)
                     (deletedTasks.map { Triple(it.id, it.title, "task") } + deletedHabits.map { Triple(it.id, it.title, "habit") }).forEach { (id, title, kind) ->
-                        LibraryRow("Papelera · $title", "Restaurar") { if (kind == "task") viewModel.restoreTask(id) else viewModel.restoreHabit(id) }
-                        TextButton(onClick = { if (kind == "task") viewModel.permanentlyDeleteTask(id) else viewModel.permanentlyDeleteHabit(id) }) { Text("Eliminar definitivamente", color = Coral, fontSize = 12.sp) }
+                        TrashRow(
+                            title = title,
+                            onRestore = { if (kind == "task") viewModel.restoreTask(id) else viewModel.restoreHabit(id) },
+                            onDeleteForever = { if (kind == "task") viewModel.permanentlyDeleteTask(id) else viewModel.permanentlyDeleteHabit(id) }
+                        )
                     }
                 }
             }
@@ -748,10 +759,41 @@ private fun RowScope.StatCell(value: String, label: String) {
 }
 
 @Composable
-private fun LibraryRow(label: String, action: String, onClick: () -> Unit) {
+private fun LibraryRow(label: String, action: String, icon: TrazoIconKind, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f), maxLines = 1)
+        TrazoIcon(icon, color = Sky, size = 18.dp)
+        Text(label, modifier = Modifier.weight(1f).padding(start = 9.dp), maxLines = 1)
         TextButton(onClick = onClick) { Text(action, color = Leaf) }
+    }
+}
+
+@Composable
+private fun TrashRow(title: String, onRestore: () -> Unit, onDeleteForever: () -> Unit) {
+    var confirming by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .border(1.dp, Ink.copy(alpha = .10f), RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 7.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TrazoIcon(TrazoIconKind.DELETE, color = Coral, size = 18.dp)
+            Text(title, modifier = Modifier.weight(1f).padding(start = 9.dp), maxLines = 2, fontWeight = FontWeight.SemiBold)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onRestore) { Text("Restaurar", color = Leaf, fontSize = 12.sp) }
+            TextButton(onClick = { confirming = true }) { Text("Eliminar para siempre", color = Coral, fontSize = 12.sp) }
+        }
+    }
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("¿Eliminar definitivamente?", style = MaterialTheme.typography.titleLarge) },
+            text = { Text("“$title” desaparecerá del dispositivo y esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = { confirming = false; onDeleteForever() }) { Text("Eliminar para siempre", color = Coral) }
+            },
+            dismissButton = { TextButton(onClick = { confirming = false }) { Text("Cancelar") } },
+            containerColor = Paper
+        )
     }
 }
 
@@ -1169,7 +1211,7 @@ private fun EditButton(label: String, onEdit: () -> Unit) {
 
 @Composable
 private fun ArchiveButton(label: String, onArchive: () -> Unit) {
-    TextButton(onClick = onArchive, contentPadding = PaddingValues(7.dp), modifier = Modifier.semantics { contentDescription = "Archivar $label" }) {
+    TextButton(onClick = onArchive, contentPadding = PaddingValues(7.dp), modifier = Modifier.semantics { contentDescription = "Archivar $label; se conservará en Archivadas" }) {
         TrazoIcon(TrazoIconKind.ARCHIVE, color = Sky, size = 21.dp)
     }
 }
@@ -1212,16 +1254,16 @@ private fun SketchCheck(checked: Boolean, onClick: () -> Unit) {
 @Composable
 private fun DeleteButton(label: String, onDelete: () -> Unit) {
     var confirming by remember { mutableStateOf(false) }
-    TextButton(onClick = { confirming = true }, contentPadding = PaddingValues(8.dp), modifier = Modifier.semantics { contentDescription = "Eliminar $label" }) {
+    TextButton(onClick = { confirming = true }, contentPadding = PaddingValues(8.dp), modifier = Modifier.semantics { contentDescription = "Enviar $label a la Papelera" }) {
         TrazoIcon(TrazoIconKind.DELETE, color = MutedInk, size = 20.dp)
     }
     if (confirming) {
         AlertDialog(
             onDismissRequest = { confirming = false },
-            title = { Text("¿Borrar $label?", style = MaterialTheme.typography.titleLarge) },
-            text = { Text("Se moverá a la papelera y podrás deshacerlo.") },
+            title = { Text("¿Enviar a Papelera?", style = MaterialTheme.typography.titleLarge) },
+            text = { Text("El $label dejará de aparecer, pero podrás restaurarlo desde Papelera.") },
             confirmButton = {
-                TextButton(onClick = { confirming = false; onDelete() }) { Text("Borrar", color = Coral) }
+                TextButton(onClick = { confirming = false; onDelete() }) { Text("Mover a Papelera", color = Coral) }
             },
             dismissButton = {
                 TextButton(onClick = { confirming = false }) { Text("Conservar") }

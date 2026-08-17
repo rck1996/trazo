@@ -206,3 +206,9 @@ La vista minimalista dejó de ser únicamente una reducción de movimiento. Ahor
 Los caracteres de fuente usados como acciones se sustituyeron por un sistema vectorial propio dibujado en Compose, sin dependencias nuevas. Editar, programar, archivar y eliminar ahora se reconocen como lápiz, calendario con reloj, caja de archivo y papelera. El mismo lenguaje se aplica a navegación, creación, calendario, hábitos, enfoque, ajustes, voz, notificaciones, importar/exportar, flechas, cerrar y completar.
 
 El grosor, las terminaciones redondeadas y la escala son comunes. En el estilo artístico el trazo conserva una desviación manual mínima; en modo minimalista queda completamente geométrico y monocromático. Los emojis elegidos como contenido de un hábito no se alteran porque pertenecen a los datos de la persona y no a la interfaz.
+
+## 22. Archivadas y Papelera — versión 3.3.3
+
+Se eliminó la sección combinada que hacía parecer equivalentes ambas acciones. Ajustes presenta ahora dos destinos independientes: Archivadas conserva íntegramente los elementos ocultos de las listas, mientras Papelera contiene los borrados y permite restaurarlos o eliminarlos definitivamente.
+
+Archivar informa el destino mediante Snackbar y ofrece Deshacer. Eliminar habla explícitamente de mover a Papelera antes de actuar. El borrado permanente muestra una segunda confirmación con el nombre del elemento y advierte que no se puede deshacer.

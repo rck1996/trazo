@@ -5,13 +5,13 @@ plugins {
 
 android {
     namespace = "com.trazo.app"
-    compileSdk = 37
+    compileSdk = 36
     compileSdkMinor = 0
 
     defaultConfig {
         applicationId = "com.trazo.app"
         minSdk = 26
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 23
         versionName = "3.3.4"
 
@@ -49,11 +49,11 @@ dependencies {
     androidTestImplementation(composeBom)
 
     implementation("androidx.activity:activity-compose:1.13.0")
-    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")

@@ -51,7 +51,7 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 2. Usa JDK 17 y permite que Android Studio instale Android SDK 37.0 si lo solicita.
 3. Sincroniza Gradle y ejecuta el módulo `app` en un emulador o dispositivo Android 8.0+.
 
-El proyecto fija AGP 9.2.1, Gradle 9.4.1, Kotlin/Compose Compiler 2.3.21, Android SDK 37.0 y Compose BOM 2026.06.00.
+El proyecto fija AGP 9.2.1, Gradle 9.4.1, Kotlin/Compose Compiler 2.3.21, Android SDK 36.0 estable y Compose BOM 2026.06.00.
 
 ## Arquitectura mínima
 

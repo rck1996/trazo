@@ -138,9 +138,9 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private enum class Section(val label: String, val symbol: String) {
-    TODAY("Hoy", "☀"), TASKS("Tareas", "✓"), CALENDAR("Planner", "▦"),
-    HABITS("Hábitos", "↻"), FOCUS("Enfoque", "◉")
+private enum class Section(val label: String, val icon: TrazoIconKind) {
+    TODAY("Hoy", TrazoIconKind.TODAY), TASKS("Tareas", TrazoIconKind.TASK), CALENDAR("Planner", TrazoIconKind.CALENDAR),
+    HABITS("Hábitos", TrazoIconKind.HABIT), FOCUS("Enfoque", TrazoIconKind.FOCUS)
 }
 
 private enum class Composer { TASK, HABIT }
@@ -214,7 +214,7 @@ fun TrazoApp(
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.then(if (minimalMode) Modifier else Modifier.rotate(-2f))
                         .semantics { contentDescription = "Crear elemento" }
-                ) { Text("＋", fontSize = 28.sp, fontWeight = FontWeight.Light) }
+                ) { TrazoIcon(TrazoIconKind.ADD, color = Color.White, size = 25.dp, description = "Crear elemento") }
                 }
             }
         ) { padding ->
@@ -359,7 +359,13 @@ private fun PageHeader(
                         .background(if (minimalMode) Color.Transparent else Coral)
                         .border(if (minimalMode) 1.dp else 2.dp, if (minimalMode) Ink else Paper, CircleShape),
                     contentAlignment = Alignment.Center
-                ) { Text(if (minimalMode) "⋮" else "⚙", color = if (minimalMode) Ink else Color.White, fontSize = if (minimalMode) 22.sp else 14.sp) }
+                ) {
+                    TrazoIcon(
+                        TrazoIconKind.SETTINGS,
+                        color = if (minimalMode) Ink else Color.White,
+                        size = if (minimalMode) 21.dp else 15.dp
+                    )
+                }
             }
         }
     }
@@ -479,7 +485,8 @@ private fun ReviewCard(
             }
             Text(summary.suggestion, color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
             if (summary.overdueTasks > 0) TextButton(onClick = onOpenPlanner, contentPadding = PaddingValues(top = 5.dp)) {
-                Text("Revisar agenda →", color = Coral, fontWeight = FontWeight.Bold)
+                Text("Revisar agenda", color = Coral, fontWeight = FontWeight.Bold)
+                TrazoIcon(TrazoIconKind.ARROW_RIGHT, color = Coral, size = 16.dp, modifier = Modifier.padding(start = 6.dp))
             }
         }
     }
@@ -515,10 +522,12 @@ private fun LocalDataCard(onExport: () -> Unit, onImport: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TextButton(onClick = onExport, modifier = Modifier.weight(1f)) {
-                    Text("⇩ Exportar", color = Leaf, fontWeight = FontWeight.Bold)
+                    TrazoIcon(TrazoIconKind.EXPORT, color = Leaf, size = 18.dp)
+                    Text("Exportar", color = Leaf, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 7.dp))
                 }
                 TextButton(onClick = onImport, modifier = Modifier.weight(1f)) {
-                    Text("⇧ Importar", color = Coral, fontWeight = FontWeight.Bold)
+                    TrazoIcon(TrazoIconKind.IMPORT, color = Coral, size = 18.dp)
+                    Text("Importar", color = Coral, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 7.dp))
                 }
             }
         }
@@ -537,9 +546,9 @@ private fun QuickActions(onCapture: () -> Unit, onPlanner: () -> Unit, onFocus: 
         Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        QuickAction("＋", "Capturar", Coral.copy(alpha = .13f), onCapture)
-        QuickAction("▦", "Planear", Sky.copy(alpha = .17f), onPlanner)
-        QuickAction("◉", "Enfocar", Leaf.copy(alpha = .14f), onFocus)
+        QuickAction(TrazoIconKind.ADD, "Capturar", Coral.copy(alpha = .13f), onCapture)
+        QuickAction(TrazoIconKind.CALENDAR, "Planear", Sky.copy(alpha = .17f), onPlanner)
+        QuickAction(TrazoIconKind.FOCUS, "Enfocar", Leaf.copy(alpha = .14f), onFocus)
     }
 }
 
@@ -585,8 +594,8 @@ private fun CaptureSheet(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp).semantics { contentDescription = "Dictar una nota de voz" }
             ) {
                 Row(Modifier.padding(13.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Text("●", color = Coral, fontSize = 16.sp)
-                    Text("  Dictar nota de voz", color = Ink, fontWeight = FontWeight.Bold)
+                    TrazoIcon(TrazoIconKind.MICROPHONE, color = Coral, size = 19.dp)
+                    Text("Dictar nota de voz", color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 9.dp))
                 }
             }
             Button(
@@ -603,7 +612,7 @@ private fun CaptureSheet(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp).sketchBorder(Coral.copy(alpha = .45f))
             ) {
                 Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("✓", color = Coral, fontSize = 27.sp, fontWeight = FontWeight.Black)
+                    TrazoIcon(TrazoIconKind.TASK, color = Coral, size = 27.dp)
                     Column(Modifier.padding(start = 15.dp)) {
                         Text("Tarea", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Text("Algo que quieres hacer una vez", color = MutedInk, fontSize = 13.sp)
@@ -617,7 +626,7 @@ private fun CaptureSheet(
                 modifier = Modifier.fillMaxWidth().padding(top = 11.dp).sketchBorder(Leaf.copy(alpha = .45f))
             ) {
                 Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("↻", color = Leaf, fontSize = 27.sp, fontWeight = FontWeight.Black)
+                    TrazoIcon(TrazoIconKind.HABIT, color = Leaf, size = 27.dp)
                     Column(Modifier.padding(start = 15.dp)) {
                         Text("Hábito", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Text("Algo que quieres repetir con constancia", color = MutedInk, fontSize = 13.sp)
@@ -747,7 +756,7 @@ private fun LibraryRow(label: String, action: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RowScope.QuickAction(symbol: String, label: String, color: Color, onClick: () -> Unit) {
+private fun RowScope.QuickAction(icon: TrazoIconKind, label: String, color: Color, onClick: () -> Unit) {
     val minimalMode = LocalMinimalMode.current
     Surface(
         onClick = onClick,
@@ -756,7 +765,7 @@ private fun RowScope.QuickAction(symbol: String, label: String, color: Color, on
         modifier = Modifier.weight(1f).sketchBorder(Ink.copy(alpha = .18f))
     ) {
         Column(Modifier.padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(symbol, fontSize = 21.sp, fontWeight = FontWeight.Black, color = Ink)
+            TrazoIcon(icon, color = Ink, size = 22.dp)
             Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MutedInk)
         }
     }
@@ -773,7 +782,7 @@ private fun ReminderCard() {
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🔔", fontSize = 20.sp)
+                TrazoIcon(TrazoIconKind.NOTIFICATION, color = Coral, size = 21.dp)
                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                     Text("Resumen diario", fontWeight = FontWeight.Bold)
                     Text(if (enabled) "Te avisaré a las %02d:00".format(hour) else "Recordatorios desactivados", color = MutedInk, fontSize = 13.sp)
@@ -1009,7 +1018,10 @@ private fun TaskCard(
                             today.plusDays(1) -> "Mañana"
                             else -> date.format(DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("es-CL")))
                         }
-                        Text("◷ $label", color = if (!task.completed && date.isBefore(today)) Coral else MutedInk, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TrazoIcon(TrazoIconKind.SCHEDULE, color = if (!task.completed && date.isBefore(today)) Coral else MutedInk, size = 14.dp)
+                            Text(label, color = if (!task.completed && date.isBefore(today)) Coral else MutedInk, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
+                        }
                     }
                 }
                 if (task.priority == TaskPriority.IMPORTANT && !task.completed) Text("!", color = Coral, fontWeight = FontWeight.Black, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
@@ -1036,7 +1048,7 @@ private fun TaskDateButton(current: LocalDate?, onChange: (LocalDate?) -> Unit) 
     TextButton(
         onClick = { showPicker = true }, contentPadding = PaddingValues(6.dp),
         modifier = Modifier.semantics { contentDescription = "Cambiar fecha" }
-    ) { Text("◷", color = if (current == null) MutedInk else Leaf, fontSize = 18.sp) }
+    ) { TrazoIcon(TrazoIconKind.SCHEDULE, color = if (current == null) MutedInk else Leaf, size = 20.dp) }
     if (showPicker) {
         val state = rememberDatePickerState(
             initialSelectedDateMillis = (current ?: LocalDate.now()).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
@@ -1151,14 +1163,14 @@ private fun HabitWeek(habit: Habit, today: LocalDate) {
 @Composable
 private fun EditButton(label: String, onEdit: () -> Unit) {
     TextButton(onClick = onEdit, contentPadding = PaddingValues(7.dp), modifier = Modifier.semantics { contentDescription = "Editar $label" }) {
-        Text("✎", color = Leaf, fontSize = 18.sp)
+        TrazoIcon(TrazoIconKind.EDIT, color = Leaf, size = 20.dp)
     }
 }
 
 @Composable
 private fun ArchiveButton(label: String, onArchive: () -> Unit) {
     TextButton(onClick = onArchive, contentPadding = PaddingValues(7.dp), modifier = Modifier.semantics { contentDescription = "Archivar $label" }) {
-        Text("⌄", color = Sky, fontSize = 18.sp)
+        TrazoIcon(TrazoIconKind.ARCHIVE, color = Sky, size = 21.dp)
     }
 }
 
@@ -1201,7 +1213,7 @@ private fun SketchCheck(checked: Boolean, onClick: () -> Unit) {
 private fun DeleteButton(label: String, onDelete: () -> Unit) {
     var confirming by remember { mutableStateOf(false) }
     TextButton(onClick = { confirming = true }, contentPadding = PaddingValues(8.dp), modifier = Modifier.semantics { contentDescription = "Eliminar $label" }) {
-        Text("×", color = MutedInk, fontSize = 22.sp)
+        TrazoIcon(TrazoIconKind.DELETE, color = MutedInk, size = 20.dp)
     }
     if (confirming) {
         AlertDialog(
@@ -1232,9 +1244,15 @@ private fun EmptyNote(title: String, subtitle: String, action: (() -> Unit)?, il
             modifier = Modifier.size(66.dp).padding(end = 10.dp)
         )
         Column(Modifier.weight(1f)) {
-            Text("⌁  $title", fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TrazoIcon(TrazoIconKind.TASK, color = Ink, size = 17.dp)
+                Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 7.dp))
+            }
             Text(subtitle, color = MutedInk, fontSize = 14.sp)
-            if (action != null) TextButton(onClick = action, contentPadding = PaddingValues(top = 8.dp)) { Text("Crear ahora →", color = Coral) }
+            if (action != null) TextButton(onClick = action, contentPadding = PaddingValues(top = 8.dp)) {
+                Text("Crear ahora", color = Coral)
+                TrazoIcon(TrazoIconKind.ARROW_RIGHT, color = Coral, size = 15.dp, modifier = Modifier.padding(start = 6.dp))
+            }
         }
     }
 }
@@ -1259,7 +1277,7 @@ private fun SketchNavigation(selected: Section, onSelect: (Section) -> Unit) {
                         .clickable { onSelect(section) }.padding(vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(if (minimalMode && section == Section.TODAY) "○" else section.symbol, color = tint, fontWeight = FontWeight.Black, fontSize = 20.sp)
+                    TrazoIcon(section.icon, color = tint, size = 21.dp)
                     Text(section.label, color = if (active) Ink else MutedInk, fontSize = 12.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)
                     Canvas(Modifier.width(28.dp).height(3.dp)) {
                         if (active) drawLine(indicator, Offset(4.dp.toPx(), center.y), Offset(size.width - 2.dp.toPx(), center.y), 2.dp.toPx(), StrokeCap.Round)
@@ -1462,7 +1480,10 @@ private fun HabitComposer(
             ) {
                 skippedDates.sorted().forEach { date ->
                     Surface(onClick = { skippedDates = skippedDates - date }, color = Lavender.copy(alpha = .16f), shape = RoundedCornerShape(10.dp)) {
-                        Text(date.format(DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("es-CL"))) + "  ×", color = Ink, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp))
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(date.format(DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("es-CL"))), color = Ink, fontSize = 12.sp)
+                            TrazoIcon(TrazoIconKind.CLOSE, color = Ink, size = 13.dp, modifier = Modifier.padding(start = 7.dp))
+                        }
                     }
                 }
             }

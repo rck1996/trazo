@@ -123,17 +123,17 @@ private fun CalendarTitle(
             Text("AGENDA VIVA", color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
             Text(title.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.headlineMedium)
         }
-        MiniArrow("‹", "Anterior", onPrevious)
-        MiniArrow("›", "Siguiente", onNext)
+        MiniArrow(TrazoIconKind.CHEVRON_LEFT, "Anterior", onPrevious)
+        MiniArrow(TrazoIconKind.CHEVRON_RIGHT, "Siguiente", onNext)
     }
 }
 
 @Composable
-private fun MiniArrow(symbol: String, description: String, onClick: () -> Unit) {
+private fun MiniArrow(icon: TrazoIconKind, description: String, onClick: () -> Unit) {
     Box(
         Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center
-    ) { Text(symbol, fontSize = 32.sp, color = Ink) }
+    ) { TrazoIcon(icon, color = Ink, size = 24.dp, description = description) }
 }
 
 @Composable
@@ -171,7 +171,10 @@ private fun DayAgenda(
                     Text(date.format(DateTimeFormatter.ofPattern("d 'de' MMMM", EsLocale)), color = MutedInk)
                 }
                 Surface(onClick = { onAddTask(date) }, color = Coral, shape = RoundedCornerShape(14.dp)) {
-                    Text("＋ Tarea", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp))
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TrazoIcon(TrazoIconKind.ADD, color = Color.White, size = 17.dp)
+                        Text("Tarea", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 7.dp))
+                    }
                 }
             }
             AgendaLabel("Tareas", dayTasks.count { it.completed }, dayTasks.size)
@@ -228,7 +231,8 @@ private fun CalendarHabitRow(
             Text(habit.emoji, fontSize = 22.sp)
             Text(habit.title, modifier = Modifier.weight(1f).padding(horizontal = 12.dp), fontWeight = FontWeight.SemiBold)
             TextButton(onClick = { if (skipped) onExceptionToggle(habit.id, date) else onToggle(habit.id, date) }) {
-                Text(if (skipped) "Restaurar" else if (done) "Hecho ✓" else "Marcar", color = if (done) Leaf else Coral, fontWeight = FontWeight.Bold)
+                Text(if (skipped) "Restaurar" else if (done) "Hecho" else "Marcar", color = if (done) Leaf else Coral, fontWeight = FontWeight.Bold)
+                if (done) TrazoIcon(TrazoIconKind.CHECK, color = Leaf, size = 15.dp, modifier = Modifier.padding(start = 5.dp))
             }
             TextButton(onClick = { onExceptionToggle(habit.id, date) }) {
                 Text(if (skipped) "Omitido" else "Omitir", color = MutedInk, fontSize = 11.sp)
@@ -274,7 +278,7 @@ private fun PlannerDay(
                     Text(date.format(DateTimeFormatter.ofPattern("EEEE", EsLocale)).replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold)
                     Text("${tasks.size} tareas · $habitCount hábitos", color = MutedInk, fontSize = 13.sp)
                 }
-                Text("→", color = Coral, fontSize = 20.sp)
+                TrazoIcon(TrazoIconKind.ARROW_RIGHT, color = Coral, size = 20.dp)
             }
             tasks.take(3).forEach { task ->
                 Row(Modifier.fillMaxWidth().clickable { onTaskToggle(task.id) }.padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {

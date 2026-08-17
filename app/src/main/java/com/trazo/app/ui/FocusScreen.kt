@@ -220,7 +220,8 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
         }
         if (selectedTask != null) item {
             TextButton(onClick = { onTaskComplete(selectedTask.id); selectedTaskId = null }, modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth()) {
-                Text("Marcar tarea como terminada ✓", color = Leaf, fontWeight = FontWeight.Bold)
+                Text("Marcar tarea como terminada", color = Leaf, fontWeight = FontWeight.Bold)
+                TrazoIcon(TrazoIconKind.CHECK, color = Leaf, size = 17.dp, modifier = Modifier.padding(start = 7.dp))
             }
         }
     }
@@ -289,7 +290,7 @@ private fun AmbientModeButton(running: Boolean, onClick: () -> Unit) {
             Modifier.padding(horizontal = 15.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("◉", color = if (running) Leaf else MutedInk.copy(alpha = .45f), fontSize = 20.sp)
+            TrazoIcon(TrazoIconKind.FOCUS, color = if (running) Leaf else MutedInk.copy(alpha = .45f), size = 20.dp)
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text("Pantalla siempre activa", fontWeight = FontWeight.Bold, color = if (running) Ink else MutedInk)
                 Text(
@@ -298,7 +299,10 @@ private fun AmbientModeButton(running: Boolean, onClick: () -> Unit) {
                     fontSize = 11.sp
                 )
             }
-            Text("Abrir →", color = if (running) Coral else MutedInk.copy(alpha = .45f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Abrir", color = if (running) Coral else MutedInk.copy(alpha = .45f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                TrazoIcon(TrazoIconKind.ARROW_RIGHT, color = if (running) Coral else MutedInk.copy(alpha = .45f), size = 14.dp, modifier = Modifier.padding(start = 5.dp))
+            }
         }
     }
 }
@@ -393,7 +397,10 @@ private fun AmbientFocusMode(
             TextButton(
                 onClick = onClose,
                 modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 12.dp)
-            ) { Text("Salir  ×", color = Color(0xFF777B76), fontSize = 13.sp) }
+            ) {
+                Text("Salir", color = Color(0xFF777B76), fontSize = 13.sp)
+                TrazoIcon(TrazoIconKind.CLOSE, color = Color(0xFF777B76), size = 14.dp, modifier = Modifier.padding(start = 6.dp))
+            }
         }
     }
 }
@@ -643,17 +650,29 @@ private fun Presets(selected: Int, onSelect: (Int, Int) -> Unit, onCustom: () ->
             shape = RoundedCornerShape(13.dp),
             modifier = Modifier.weight(1.1f)
         ) {
-            Text(
-                "Ajustar ✎",
-                modifier = Modifier.padding(vertical = 10.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                fontSize = 13.sp,
-                maxLines = 1,
-                fontWeight = FontWeight.Bold,
-                color = Leaf
-            )
+            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                TrazoIcon(TrazoIconKind.EDIT, color = Leaf, size = 16.dp)
+                Text("Ajustar", modifier = Modifier.padding(start = 5.dp), fontSize = 13.sp, maxLines = 1, fontWeight = FontWeight.Bold, color = Leaf)
+            }
         }
     }
 }
 
-@Composable private fun FocusTask(task:Task,selected:Boolean,onSelect:()->Unit){ Surface(color=if(selected)Coral.copy(alpha=.18f)else PaperRaised,shape=RoundedCornerShape(14.dp),modifier=Modifier.padding(horizontal=24.dp,vertical=4.dp).fillMaxWidth().clickable(onClick=onSelect)){ Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){ Box(Modifier.size(22.dp).background(if(selected)Coral else Ink.copy(alpha=.10f),CircleShape),contentAlignment=Alignment.Center){if(selected)Text("✓",color=Color.White,fontSize=12.sp)}; Column(Modifier.weight(1f).padding(start=12.dp)){Text(task.title,fontWeight=FontWeight.SemiBold,color=Ink,maxLines=2,overflow=TextOverflow.Ellipsis);task.dueDate?.let{Text("${it.dayOfMonth}/${it.monthValue}",color=MutedInk,fontSize=12.sp)}} } } }
+@Composable
+private fun FocusTask(task: Task, selected: Boolean, onSelect: () -> Unit) {
+    Surface(
+        color = if (selected) Coral.copy(alpha = .18f) else PaperRaised,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).fillMaxWidth().clickable(onClick = onSelect)
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(22.dp).background(if (selected) Coral else Ink.copy(alpha = .10f), CircleShape), contentAlignment = Alignment.Center) {
+                if (selected) TrazoIcon(TrazoIconKind.CHECK, color = Color.White, size = 13.dp)
+            }
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(task.title, fontWeight = FontWeight.SemiBold, color = Ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                task.dueDate?.let { Text("${it.dayOfMonth}/${it.monthValue}", color = MutedInk, fontSize = 12.sp) }
+            }
+        }
+    }
+}

@@ -200,3 +200,9 @@ La vista minimalista dejó de ser únicamente una reducción de movimiento. Ahor
 - Los hábitos sustituyen su emoji a color por una marca geométrica neutra; las transiciones residuales de tarjetas, progreso, navegación y calendario se resuelven de inmediato.
 - El widget minimalista usa papel blanco, filas y rótulos neutros, botones rectos en negro y texto sin emojis; oculta arte, saludo, porcentaje ornamental y ritmo ilustrado.
 - El modo ilustrado conserva intactas las acuarelas, recursos IA, animaciones y paleta artística.
+
+## 21. Iconografía trazada — versión 3.3.2
+
+Los caracteres de fuente usados como acciones se sustituyeron por un sistema vectorial propio dibujado en Compose, sin dependencias nuevas. Editar, programar, archivar y eliminar ahora se reconocen como lápiz, calendario con reloj, caja de archivo y papelera. El mismo lenguaje se aplica a navegación, creación, calendario, hábitos, enfoque, ajustes, voz, notificaciones, importar/exportar, flechas, cerrar y completar.
+
+El grosor, las terminaciones redondeadas y la escala son comunes. En el estilo artístico el trazo conserva una desviación manual mínima; en modo minimalista queda completamente geométrico y monocromático. Los emojis elegidos como contenido de un hábito no se alteran porque pertenecen a los datos de la persona y no a la interfaz.

@@ -203,3 +203,10 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - App, Pomodoro, pantalla siempre activa y estilo minimalista del widget comparten ahora la misma regla monocromática y mantienen visibles solo datos y acciones funcionales.
 - `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 26 pruebas, 0 fallos y 0 errores de Lint.
 - El APK generado corresponde a `versionCode=20`, `versionName=3.3.1`. La inspección visual queda expresamente para la prueba manual del usuario; la instalación no automatiza interacciones con la interfaz.
+
+## Validación de la versión 3.3.2
+
+- La búsqueda de interfaz ya no encuentra los antiguos caracteres ambiguos de editar, fecha, archivo, borrado, navegación, creación, voz, notificaciones ni flechas.
+- El nuevo componente contiene veinte símbolos trazados, semántica accesible cuando funciona como control y una variante limpia automática para el modo minimalista.
+- `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 26 pruebas, 0 fallos y 0 errores de Lint.
+- El APK corresponde a `versionCode=21`, `versionName=3.3.2`; la validación visual en el teléfono queda a cargo del usuario según lo acordado.

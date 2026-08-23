@@ -125,6 +125,7 @@ import com.trazo.app.model.TaskSchedule
 import com.trazo.app.model.TrazoState
 import com.trazo.app.notifications.NotificationCenter
 import com.trazo.app.notifications.ReminderHistory
+import com.trazo.app.notifications.ReminderDeliveryMode
 import com.trazo.app.notifications.ReminderPreferences
 import com.trazo.app.notifications.ReminderSettings
 import com.trazo.app.notifications.ReminderStatus
@@ -833,7 +834,7 @@ private fun ReminderCard(state: TrazoState) {
         statusRefresh++
     }
     val notificationsReady = statusRefresh.let { NotificationCenter.canNotify(context) }
-    val itemChannelReady = statusRefresh.let { NotificationCenter.itemChannelEnabled(context) }
+    val itemChannelReady = statusRefresh.let { NotificationCenter.reminderChannelEnabled(context, settings.deliveryMode) }
     val exactReady = statusRefresh.let { NotificationCenter.canScheduleExact(context) }
     val next = statusRefresh.let { ReminderStatus.nextScheduled(context, state) }
     val last = statusRefresh.let { ReminderHistory.latest(context) }
@@ -892,6 +893,76 @@ private fun ReminderCard(state: TrazoState) {
 
             if (settings.masterEnabled) {
                 Text("AVISOS PUNTUALES", color = Coral, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp, modifier = Modifier.padding(top = 13.dp, bottom = 3.dp))
+                Text("Tipo de entrega", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+                ReminderDeliveryMode.entries.chunked(2).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        row.forEach { mode ->
+                            val selected = settings.deliveryMode == mode
+                            val label = when (mode) {
+                                ReminderDeliveryMode.NOTIFICATION -> "Notificación"
+                                ReminderDeliveryMode.EARLY_ALARM -> "Alarma previa"
+                                ReminderDeliveryMode.ON_TIME_ALARM -> "Alarma en hora"
+                                ReminderDeliveryMode.BOTH_ALARMS -> "Ambas alarmas"
+                            }
+                            val subtitle = when (mode) {
+                                ReminderDeliveryMode.NOTIFICATION -> "Aviso breve"
+                                ReminderDeliveryMode.EARLY_ALARM -> "Solo antes"
+                                ReminderDeliveryMode.ON_TIME_ALARM -> "Justo a la hora"
+                                ReminderDeliveryMode.BOTH_ALARMS -> "Antes y a la hora"
+                            }
+                            Surface(
+                                onClick = { persist(settings.copy(deliveryMode = mode)) },
+                                color = if (selected) Coral else PaperRaised.copy(alpha = .72f),
+                                shape = RoundedCornerShape(11.dp),
+                                modifier = Modifier.weight(1f).padding(bottom = 6.dp)
+                            ) {
+                                Column(Modifier.padding(horizontal = 9.dp, vertical = 9.dp)) {
+                                    Text(label, color = if (selected) Color.White else Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(subtitle, color = if (selected) Color.White.copy(alpha = .82f) else MutedInk, fontSize = 10.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (settings.deliveryMode.includesEarly) {
+                    Text("Anticipación de la alarma previa", color = MutedInk, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
+                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf(5, 10, 15, 30).forEach { minutes ->
+                            val selected = settings.earlyMinutes == minutes
+                            Surface(
+                                onClick = { persist(settings.copy(earlyMinutes = minutes)) },
+                                color = if (selected) Leaf else PaperRaised.copy(alpha = .75f),
+                                shape = RoundedCornerShape(9.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("$minutes min", color = if (selected) Color.White else Ink, fontSize = 11.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(vertical = 7.dp))
+                            }
+                        }
+                    }
+                }
+                if (settings.deliveryMode.usesAlarm) {
+                    Text("Duración máxima", color = MutedInk, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(15, 30, 60).forEach { seconds ->
+                            val selected = settings.alarmDurationSeconds == seconds
+                            Surface(
+                                onClick = { persist(settings.copy(alarmDurationSeconds = seconds)) },
+                                color = if (selected) Coral else PaperRaised.copy(alpha = .75f),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    "$seconds s",
+                                    color = if (selected) Color.White else Ink,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                    Text("Se detiene antes al abrir, completar o posponer el aviso.", color = MutedInk, fontSize = 10.sp)
+                }
                 ReminderSwitchRow("Tareas con fecha y hora", "Avisa incluso con la app cerrada.", settings.taskReminders) {
                     persist(settings.copy(taskReminders = it))
                 }
@@ -951,11 +1022,11 @@ private fun ReminderCard(state: TrazoState) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TextButton(
                     onClick = {
-                        testResult = if (NotificationCenter.postTest(context)) "Prueba enviada" else "Primero permite los avisos"
+                        testResult = if (NotificationCenter.postTest(context, settings.deliveryMode, settings.alarmDurationSeconds)) "Prueba enviada" else "Primero permite los avisos"
                         statusRefresh++
                     },
                     modifier = Modifier.weight(1f)
-                ) { Text("Probar ahora", color = Coral, fontWeight = FontWeight.Bold) }
+                ) { Text("Probar sonido", color = Coral, fontWeight = FontWeight.Bold) }
                 TextButton(
                     onClick = { settingsLauncher.launch(NotificationCenter.notificationSettingsIntent(context)) },
                     modifier = Modifier.weight(1f)
@@ -1796,7 +1867,8 @@ private fun ReminderReadinessNote(active: Boolean) {
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
     val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh++ }
     val canNotify = refresh.let { NotificationCenter.canNotify(context) }
-    val canDeliver = refresh.let { NotificationCenter.itemChannelEnabled(context) }
+    val deliveryMode = remember { ReminderPreferences.load(context).deliveryMode }
+    val canDeliver = refresh.let { NotificationCenter.reminderChannelEnabled(context, deliveryMode) }
     val exact = refresh.let { NotificationCenter.canScheduleExact(context) }
     if (canDeliver && exact) {
         Text("✓ Aviso listo y puntual", color = Leaf, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))

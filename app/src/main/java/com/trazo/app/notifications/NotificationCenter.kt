@@ -2,6 +2,7 @@ package com.trazo.app.notifications
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationChannelGroup
 import android.app.NotificationManager
@@ -10,6 +11,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -28,10 +31,21 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 
+enum class ReminderDeliveryMode {
+    NOTIFICATION, EARLY_ALARM, ON_TIME_ALARM, BOTH_ALARMS;
+
+    val usesAlarm: Boolean get() = this != NOTIFICATION
+    val includesEarly: Boolean get() = this == EARLY_ALARM || this == BOTH_ALARMS
+    val includesOnTime: Boolean get() = this == NOTIFICATION || this == ON_TIME_ALARM || this == BOTH_ALARMS
+}
+
 data class ReminderSettings(
     val masterEnabled: Boolean = true,
     val taskReminders: Boolean = true,
     val habitReminders: Boolean = true,
+    val deliveryMode: ReminderDeliveryMode = ReminderDeliveryMode.ON_TIME_ALARM,
+    val earlyMinutes: Int = 10,
+    val alarmDurationSeconds: Int = 30,
     val morningEnabled: Boolean = false,
     val morningHour: Int = 9,
     val morningMinute: Int = 0,
@@ -52,6 +66,14 @@ object ReminderPreferences {
             masterEnabled = prefs.getBoolean("master_enabled", true),
             taskReminders = prefs.getBoolean("task_reminders", true),
             habitReminders = prefs.getBoolean("habit_reminders", true),
+            deliveryMode = runCatching {
+                ReminderDeliveryMode.valueOf(prefs.getString("delivery_mode", null).orEmpty())
+            }.getOrElse {
+                if (prefs.getBoolean("alarm_mode", true)) ReminderDeliveryMode.ON_TIME_ALARM
+                else ReminderDeliveryMode.NOTIFICATION
+            },
+            earlyMinutes = prefs.getInt("early_minutes", 10).takeIf { it in setOf(5, 10, 15, 30) } ?: 10,
+            alarmDurationSeconds = prefs.getInt("alarm_duration_seconds", 30).coerceIn(15, 60),
             morningEnabled = prefs.getBoolean("morning_enabled", legacyDailyEnabled),
             morningHour = prefs.getInt("morning_hour", legacyDailyHour).coerceIn(0, 23),
             morningMinute = prefs.getInt("morning_minute", 0).coerceIn(0, 59),
@@ -67,6 +89,9 @@ object ReminderPreferences {
             putBoolean("master_enabled", settings.masterEnabled)
             putBoolean("task_reminders", settings.taskReminders)
             putBoolean("habit_reminders", settings.habitReminders)
+            putString("delivery_mode", settings.deliveryMode.name)
+            putInt("early_minutes", settings.earlyMinutes)
+            putInt("alarm_duration_seconds", settings.alarmDurationSeconds)
             putBoolean("morning_enabled", settings.morningEnabled)
             putInt("morning_hour", settings.morningHour)
             putInt("morning_minute", settings.morningMinute)
@@ -120,6 +145,7 @@ object ReminderHistory {
 }
 
 object NotificationCenter {
+    const val ALARM_REMINDERS = "trazo_alarm_reminders_v3"
     const val ITEM_REMINDERS = "trazo_item_reminders_v2"
     const val PLANNING = "trazo_planning_v2"
     const val FOCUS = "trazo_focus"
@@ -127,9 +153,21 @@ object NotificationCenter {
 
     fun createChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
+        val alarmAudio = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
         manager.createNotificationChannelGroup(NotificationChannelGroup(GROUP_REMINDERS, "Avisos de Trazo"))
         manager.createNotificationChannels(
             listOf(
+                NotificationChannel(ALARM_REMINDERS, "Alarmas sonoras", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Alarmas de tareas y hábitos que repiten el sonido hasta que respondas"
+                    group = GROUP_REMINDERS
+                    setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM), alarmAudio)
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 500, 250, 500, 500, 700)
+                    setShowBadge(true)
+                },
                 NotificationChannel(ITEM_REMINDERS, "Tareas y hábitos a su hora", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Avisos puntuales, acciones para completar y posponer"
                     group = GROUP_REMINDERS
@@ -164,11 +202,12 @@ object NotificationCenter {
         return runtimeGranted && NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
-    fun itemChannelEnabled(context: Context): Boolean {
+    fun reminderChannelEnabled(context: Context, mode: ReminderDeliveryMode): Boolean {
         if (!canNotify(context)) return false
         createChannels(context)
+        val channelId = if (mode.usesAlarm) ALARM_REMINDERS else ITEM_REMINDERS
         return context.getSystemService(NotificationManager::class.java)
-            .getNotificationChannel(ITEM_REMINDERS)?.importance != NotificationManager.IMPORTANCE_NONE
+            .getNotificationChannel(channelId)?.importance != NotificationManager.IMPORTANCE_NONE
     }
 
     fun canScheduleExact(context: Context): Boolean {
@@ -197,23 +236,51 @@ object NotificationCenter {
         }.getOrDefault(false)
     }
 
-    fun postTest(context: Context): Boolean {
+    fun postTest(context: Context, mode: ReminderDeliveryMode, durationSeconds: Int = 30): Boolean {
         createChannels(context)
-        val title = "Trazo sí puede avisarte"
-        val body = "Esta es una prueba. Tus recordatorios aparecerán con sonido, vibración y acciones rápidas."
-        val notification = NotificationCompat.Builder(context, ITEM_REMINDERS)
+        val alarmMode = mode.usesAlarm
+        val title = if (alarmMode) "Prueba de alarma Trazo" else "Prueba de aviso Trazo"
+        val body = if (alarmMode) {
+            "Debe usar el volumen de alarma y repetir el sonido. Abre la notificación para detenerla."
+        } else {
+            "Este es un aviso breve con el sonido normal de notificación."
+        }
+        val channel = if (alarmMode) ALARM_REMINDERS else ITEM_REMINDERS
+        val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_launcher_handdrawn)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(openAppIntent(context, "TODAY", 7198))
             .setAutoCancel(true)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .build()
+            .setCategory(if (alarmMode) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+        if (alarmMode) builder.setTimeoutAfter(AlarmNotificationPolicy.timeoutMillis(durationSeconds))
+        val notification = builder.build().apply {
+                if (alarmMode) flags = flags or Notification.FLAG_INSISTENT
+            }
         val posted = post(context, 7199, notification)
         if (posted) ReminderHistory.record(context, title, body)
         return posted
+    }
+}
+
+object AlarmNotificationPolicy {
+    fun timeoutMillis(durationSeconds: Int): Long = durationSeconds.coerceIn(15, 60) * 1_000L
+
+    data class Delivery(val at: LocalDateTime, val stage: String, val alarm: Boolean)
+
+    fun deliveries(
+        scheduledAt: LocalDateTime,
+        mode: ReminderDeliveryMode,
+        earlyMinutes: Int
+    ): List<Delivery> = buildList {
+        if (mode.includesEarly) {
+            add(Delivery(scheduledAt.minusMinutes(earlyMinutes.coerceIn(1, 120).toLong()), "early", true))
+        }
+        if (mode.includesOnTime) {
+            add(Delivery(scheduledAt, "on_time", mode.usesAlarm))
+        }
     }
 }
 
@@ -332,16 +399,24 @@ object ReminderStatus {
         if (settings.morningEnabled) candidates += ReminderSchedulePolicy.nextDaily(settings.morningHour, settings.morningMinute, now)
         if (settings.eveningEnabled) candidates += ReminderSchedulePolicy.nextDaily(settings.eveningHour, settings.eveningMinute, now)
         if (settings.taskReminders) state.tasks.filter { it.hasActiveReminder() }.forEach {
-            val at = LocalDateTime.of(it.dueDate, LocalTime.of(it.reminderHour!!, it.reminderMinute))
-            if (at.isAfter(now)) candidates += at
+            val eventAt = LocalDateTime.of(it.dueDate, LocalTime.of(it.reminderHour!!, it.reminderMinute))
+            AlarmNotificationPolicy.deliveries(eventAt, settings.deliveryMode, settings.earlyMinutes)
+                .map { delivery -> delivery.at }
+                .filterTo(candidates) { deliveryAt -> deliveryAt.isAfter(now) }
         }
         if (settings.habitReminders) state.habits.filter { !it.archived && it.deletedAt == null && it.reminderHour != null }.forEach { habit ->
             var date = LocalDate.now()
             repeat(15) {
-                val at = LocalDateTime.of(date, LocalTime.of(habit.reminderHour!!, habit.reminderMinute))
-                if (habit.hasActiveReminderOn(date) && at.isAfter(now)) {
-                    candidates += at
-                    return@forEach
+                val eventAt = LocalDateTime.of(date, LocalTime.of(habit.reminderHour!!, habit.reminderMinute))
+                if (habit.hasActiveReminderOn(date)) {
+                    val nextDelivery = AlarmNotificationPolicy
+                        .deliveries(eventAt, settings.deliveryMode, settings.earlyMinutes)
+                        .map { delivery -> delivery.at }
+                        .firstOrNull { deliveryAt -> deliveryAt.isAfter(now) }
+                    if (nextDelivery != null) {
+                        candidates += nextDelivery
+                        return@forEach
+                    }
                 }
                 date = date.plusDays(1)
             }

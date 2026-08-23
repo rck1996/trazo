@@ -236,3 +236,13 @@ Se reconstruyó la capa de recordatorios para que la interfaz diga con claridad 
 - Si el teléfono estuvo apagado se recuperan una sola vez los avisos de las últimas seis horas, evitando tanto pérdidas silenciosas como notificaciones antiguas en masa.
 - Al elegir una hora para una tarea sin fecha, Trazo asigna hoy si aún no pasó o mañana si ya pasó. El editor informa de inmediato si falta permiso o precisión.
 - El README incorpora una galería con capturas reales de Hoy, Enfoque y Hábitos en modo oscuro.
+
+## 26. Alarma sonora real — versión 3.4.1
+
+La prueba física reveló una diferencia que no era visible en el emulador: el recordatorio llegaba correctamente, pero su canal utilizaba `USAGE_NOTIFICATION` y el tono breve de notificación. Por eso Android lo mostraba como aviso y no empleaba el volumen de alarma.
+
+Se añadió un canal nuevo e inmutable llamado «Alarmas sonoras» con tono predeterminado de alarma, `USAGE_ALARM`, vibración reconocible y prioridad alta. La entrega predeterminada es una alarma a la hora solo para recordatorios puntuales de tareas y hábitos; los resúmenes matinales, el cierre diario y Pomodoro conservan sus canales menos invasivos.
+
+El Centro de avisos ofrece cuatro modos explícitos: «Notificación» entrega un aviso breve a la hora; «Alarma previa» suena únicamente antes; «Alarma en hora» suena en el momento programado; «Ambas alarmas» programa las dos. La anticipación puede ser de 5, 10, 15 o 30 minutos. El siguiente aviso de la interfaz refleja la entrega real más próxima, incluida la anticipada.
+
+El sonido de alarma puede repetirse durante 15, 30 o 60 segundos y se detiene antes al abrir la bandeja, tocar el aviso, completar o posponer. Las notificaciones normales permanecen disponibles hasta atenderlas. Una posposición se conserva aunque Trazo reprograme sus alarmas, y completar una alarma previa de un hábito afecta la fecha del evento, incluso cuando el aviso ocurre la noche anterior. «Probar sonido» verifica exactamente el canal seleccionado. No se añadió pantalla completa: Android la reserva para casos extremadamente urgentes y no es necesaria para ofrecer una alarma audible.

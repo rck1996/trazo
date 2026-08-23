@@ -243,3 +243,17 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - Los canales quedan separados en «Tareas y hábitos a su hora» (alta importancia) y «Resumen y cierre del día» (importancia normal), mientras Pomodoro conserva su canal silencioso propio.
 - `Trazo-3.4.0-debug.apk` se instaló incrementalmente con `Success` en el Samsung SM-S936B; Android confirmó `versionCode=24`, `versionName=3.4.0`. El mismo APK quedó en `/sdcard/Download/Trazo-3.4.0.apk` con SHA-256 `36E726F9D009CB60324EF614A3F7FAFC90B932501D542DE45F9DB5C34A2DD09C`.
 - No se abrió ni se manipuló la interfaz: la revisión visual y la recepción de alarmas quedan a cargo de la prueba manual acordada con el usuario.
+
+## Validación de la versión 3.4.1
+
+- La inspección real de `dumpsys notification` confirmó la causa: `trazo_item_reminders_v2` tenía importancia alta y vibración, pero sonido `notification_sound` con atributos `USAGE_NOTIFICATION`.
+- El teléfono no tenía silenciados `STREAM_ALARM` ni `STREAM_NOTIFICATION`, descartando un problema de volumen global.
+- El nuevo canal `trazo_alarm_reminders_v3` usa el tono de alarma del sistema, atributos `USAGE_ALARM`, vibración y repetición limitada.
+- Los cuatro modos de entrega se validan como políticas distintas: notificación a la hora sin alarma, alarma solo previa, alarma solo en hora y doble alarma ordenada.
+- La anticipación admite 5, 10, 15 o 30 minutos; la repetición audible se limita a 15, 30 o 60 segundos. La notificación normal no caduca por ese límite sonoro.
+- La posposición queda persistida y se reconstruye tras cambios de configuración, actualización o reinicio. Las acciones de un aviso anticipado conservan la fecha original del evento.
+- Se añadieron seis pruebas: duración seleccionada, límites seguros y las cuatro combinaciones de entrega.
+- `testDebugUnitTest`, `lintDebug`, `assembleDebug` y `assembleRelease` finalizaron con `BUILD SUCCESSFUL`: 42 pruebas, 0 fallos y 0 errores de Lint.
+- `Trazo-3.4.1-debug.apk` se instaló incrementalmente con `Success` en el Samsung SM-S936B (`R5CY3120BQR`); Android confirmó `versionCode=25`, `versionName=3.4.1`.
+- El canal instalado expone `alarm_alert`, `USAGE_ALARM`, importancia alta y vibración. El APK quedó en `/sdcard/Download/Trazo-3.4.1.apk` con SHA-256 `8091E42770E4E49EE82D4BC62B873A3258A02967BF4061BA8551A8167732FD5E`.
+- Según lo acordado, no se abrió ni se manipuló la interfaz y no se disparó una alarma artificial; la prueba sonora queda a cargo del usuario.

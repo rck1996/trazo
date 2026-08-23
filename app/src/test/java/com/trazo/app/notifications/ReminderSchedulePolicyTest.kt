@@ -47,4 +47,57 @@ class ReminderSchedulePolicyTest {
 
         assertFalse(ReminderSchedulePolicy.shouldRecover(now.plusMinutes(1), now))
     }
+
+    @Test
+    fun `alarm duration uses the selected seconds`() {
+        assertEquals(30_000L, AlarmNotificationPolicy.timeoutMillis(30))
+    }
+
+    @Test
+    fun `alarm duration is bounded to avoid endless ringing`() {
+        assertEquals(15_000L, AlarmNotificationPolicy.timeoutMillis(1))
+        assertEquals(60_000L, AlarmNotificationPolicy.timeoutMillis(600))
+    }
+
+    @Test
+    fun `notification is delivered once at the scheduled time without alarm sound`() {
+        val eventAt = LocalDateTime.of(2026, 8, 24, 9, 0)
+
+        val deliveries = AlarmNotificationPolicy.deliveries(eventAt, ReminderDeliveryMode.NOTIFICATION, 10)
+
+        assertEquals(listOf(AlarmNotificationPolicy.Delivery(eventAt, "on_time", false)), deliveries)
+    }
+
+    @Test
+    fun `early alarm is delivered only before the scheduled time`() {
+        val eventAt = LocalDateTime.of(2026, 8, 24, 9, 0)
+
+        val deliveries = AlarmNotificationPolicy.deliveries(eventAt, ReminderDeliveryMode.EARLY_ALARM, 15)
+
+        assertEquals(listOf(AlarmNotificationPolicy.Delivery(eventAt.minusMinutes(15), "early", true)), deliveries)
+    }
+
+    @Test
+    fun `on time alarm is delivered at the scheduled time`() {
+        val eventAt = LocalDateTime.of(2026, 8, 24, 9, 0)
+
+        val deliveries = AlarmNotificationPolicy.deliveries(eventAt, ReminderDeliveryMode.ON_TIME_ALARM, 10)
+
+        assertEquals(listOf(AlarmNotificationPolicy.Delivery(eventAt, "on_time", true)), deliveries)
+    }
+
+    @Test
+    fun `both alarms are ordered before and at the scheduled time`() {
+        val eventAt = LocalDateTime.of(2026, 8, 24, 9, 0)
+
+        val deliveries = AlarmNotificationPolicy.deliveries(eventAt, ReminderDeliveryMode.BOTH_ALARMS, 30)
+
+        assertEquals(
+            listOf(
+                AlarmNotificationPolicy.Delivery(eventAt.minusMinutes(30), "early", true),
+                AlarmNotificationPolicy.Delivery(eventAt, "on_time", true)
+            ),
+            deliveries
+        )
+    }
 }

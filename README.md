@@ -34,7 +34,7 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 - Fechas opcionales y reprogramables para cada tarea.
 - Calendario con agenda diaria, planner semanal y vista mensual.
 - Pomodoro 25/5 o 50/10 asociado a una tarea pendiente.
-- Centro de avisos con diagnóstico de permisos, próximo/último envío y notificación de prueba.
+- Centro de avisos con diagnóstico de permisos, próximo/último envío y prueba audible del modo elegido.
 - Agenda matinal y cierre del día independientes, con cualquier hora en formato `HH:MM`.
 - Notificación persistente mientras el Pomodoro está activo.
 - Ilustraciones originales estilo sketch para tomate, taza, encabezados y widgets, integradas sin conexión.
@@ -49,7 +49,7 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 - Widget principal adaptativo: reparte su altura según el contenido y ofrece configuración independiente de secciones, prioridad compacta, Pomodoro, color y cantidad de tarjetas.
 - Ilustraciones sketch por categoría de hábito: Hidratación, Autocuidado, Alimentación, Movimiento y Descanso.
 - Copia de seguridad JSON local mediante los selectores de exportación e importación de Android.
-- Recordatorios por tarea o hábito con alarma puntual, recuperación tras reinicio y acciones «Hecho», `+10 min` y `+30 min`.
+- Recordatorios por tarea o hábito con cuatro entregas elegibles: notificación normal, alarma previa, alarma a la hora o ambas alarmas. La anticipación (5–30 min) y la duración sonora (15–60 s) son configurables; incluyen recuperación tras reinicio y acciones «Hecho», `+10 min` y `+30 min`.
 - Hábitos medibles por veces, minutos o pasos, con meta personalizada y progreso diario.
 - Captura inteligente en español con fechas, horas, prioridad y etiquetas, además de dictado por voz.
 - Búsqueda por texto y etiquetas, archivo, papelera recuperable y acción Deshacer.
@@ -87,12 +87,12 @@ Desde Android Studio o con el Gradle Wrapper incluido:
 ./gradlew assembleDebug
 ```
 
-El APK instalable más reciente también se copia a `artifacts/Trazo-3.4.0-debug.apk`.
+El APK instalable más reciente también se copia a `artifacts/Trazo-3.4.1-debug.apk`.
 
 Para instalarlo por USB con el teléfono autorizado:
 
 ```powershell
-adb install -r -t artifacts\Trazo-3.4.0-debug.apk
+adb install -r -t artifacts\Trazo-3.4.1-debug.apk
 ```
 
 Las pruebas unitarias cubren el cálculo de rachas, incluidos días no programados y días omitidos.
@@ -101,7 +101,7 @@ Las pruebas unitarias cubren el cálculo de rachas, incluidos días no programad
 
 - Cada push o pull request hacia `main` ejecuta pruebas unitarias, Android Lint y la compilación del APK; los reportes y el APK quedan como artefactos temporales de GitHub Actions.
 - Dependabot revisa semanalmente las dependencias de Gradle y de GitHub Actions.
-- Una etiqueta semántica como `v3.4.0` valida que versión, código y APK coincidan, vuelve a ejecutar las comprobaciones y publica automáticamente el APK junto con su checksum SHA-256.
+- Una etiqueta semántica como `v3.4.1` valida que versión, código y APK coincidan, vuelve a ejecutar las comprobaciones y publica automáticamente el APK junto con su checksum SHA-256.
 
 Para preparar una versión nueva, actualiza `versionCode` y `versionName`, genera `artifacts/Trazo-X.Y.Z-debug.apk`, confirma los cambios y crea la etiqueta `vX.Y.Z`.
 

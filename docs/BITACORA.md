@@ -222,3 +222,17 @@ La misma política protege los recordatorios que llegan al mismo tiempo que una 
 ## 24. Publicación y automatización
 
 El repositorio público incorpora CI para pruebas, Lint y APK en cada cambio a `main`, Dependabot semanal para Gradle y Actions, y CD por etiquetas semánticas con checksum SHA-256. El SDK de compilación se fija en API 36 estable: API 37 solo estaba disponible en la instalación preview local y no podía reproducirse desde el repositorio público de `sdkmanager`.
+
+## 25. Centro de avisos y alarmas — versión 3.4.0
+
+Se reconstruyó la capa de recordatorios para que la interfaz diga con claridad si Android realmente puede entregar un aviso. Ajustes muestra permiso global, estado del canal puntual, acceso opcional a alarmas exactas, siguiente evento programado, último aviso enviado y una prueba inmediata. El permiso de notificaciones dejó de solicitarse al abrir la aplicación: ahora se pide con contexto al activar los avisos o elegir una hora.
+
+- Los recordatorios puntuales se separaron del resumen en un canal de importancia alta con sonido, vibración y distintivo configurables desde Android.
+- Tareas y hábitos pueden activarse por separado. Desactivar una categoría cancela alarmas y notificaciones visibles de esa categoría.
+- Agenda matinal y cierre del día son independientes, admiten hora y minuto libres y resumen solo pendientes reales.
+- Las acciones rápidas permiten completar, posponer 10 minutos o posponer 30 minutos sin abrir la app.
+- Cuando Android concede acceso a «Alarmas y recordatorios» se usa entrega exacta; sin acceso se conserva una alarma aproximada segura en vez de perder el aviso.
+- Tras reinicio, cambio de zona/hora, actualización o concesión de precisión se reconstruye toda la programación.
+- Si el teléfono estuvo apagado se recuperan una sola vez los avisos de las últimas seis horas, evitando tanto pérdidas silenciosas como notificaciones antiguas en masa.
+- Al elegir una hora para una tarea sin fecha, Trazo asigna hoy si aún no pasó o mañana si ya pasó. El editor informa de inmediato si falta permiso o precisión.
+- El README incorpora una galería con capturas reales de Hoy, Enfoque y Hábitos en modo oscuro.

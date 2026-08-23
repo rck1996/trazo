@@ -51,7 +51,7 @@ class FocusTimerService : Service() {
                 if (NotificationCenter.canNotify(this@FocusTimerService)) {
                     val wasBreak = phase == "BREAK"
                     NotificationCenter.post(this@FocusTimerService,
-                        7202, NotificationCompat.Builder(this@FocusTimerService, NotificationCenter.REMINDERS)
+                        7202, NotificationCompat.Builder(this@FocusTimerService, NotificationCenter.PLANNING)
                             .setSmallIcon(R.drawable.ic_launcher_handdrawn)
                             .setContentTitle(if (wasBreak) "Descanso terminado" else "Pomodoro terminado")
                             .setContentText(if (wasBreak) "Cuando quieras, vuelve a tu siguiente trazo." else "Buen trabajo. Es momento de respirar.")

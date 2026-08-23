@@ -232,3 +232,14 @@ El dato de prueba fue eliminado y la aplicación quedó instalada y limpia en el
 - El primer runner detectó que API 37 no estaba disponible en el canal estable de `sdkmanager`; la configuración reproducible se alineó con API 36 y con las últimas líneas compatibles de Core y Lifecycle.
 - El pase local posterior `testDebugUnitTest lintDebug assembleDebug` terminó con `BUILD SUCCESSFUL`: 31 pruebas, 0 fallos y 0 errores de Lint.
 - Los tres archivos YAML de GitHub se validaron sintácticamente y el APK 3.3.4 se regeneró desde la misma fuente que se publicará.
+
+## Validación de la versión 3.4.0
+
+- Se añadieron cinco casos unitarios para agenda diaria y recuperación de avisos: mismo día, salto al día siguiente, ventana reciente, aviso antiguo y evento futuro.
+- `testDebugUnitTest`, `lintDebug`, `assembleDebug` y `assembleRelease` finalizaron con `BUILD SUCCESSFUL`: 36 pruebas, 0 fallos y 0 errores de Lint.
+- La nueva configuración migra el antiguo resumen diario sin borrar la hora elegida y mantiene activos por defecto los recordatorios puntuales ya creados.
+- La política cancela avisos visibles cuando se pausa todo o se desactiva la categoría de tareas o hábitos.
+- Los avisos puntuales usan alarma exacta únicamente si Android concede el acceso especial; en caso contrario recurren a `setAndAllowWhileIdle`.
+- Los canales quedan separados en «Tareas y hábitos a su hora» (alta importancia) y «Resumen y cierre del día» (importancia normal), mientras Pomodoro conserva su canal silencioso propio.
+- `Trazo-3.4.0-debug.apk` se instaló incrementalmente con `Success` en el Samsung SM-S936B; Android confirmó `versionCode=24`, `versionName=3.4.0`. El mismo APK quedó en `/sdcard/Download/Trazo-3.4.0.apk` con SHA-256 `36E726F9D009CB60324EF614A3F7FAFC90B932501D542DE45F9DB5C34A2DD09C`.
+- No se abrió ni se manipuló la interfaz: la revisión visual y la recepción de alarmas quedan a cargo de la prueba manual acordada con el usuario.

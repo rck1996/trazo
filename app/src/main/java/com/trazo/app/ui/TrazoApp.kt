@@ -122,8 +122,12 @@ import com.trazo.app.model.HabitUnit
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
 import com.trazo.app.model.TaskSchedule
+import com.trazo.app.model.TrazoState
 import com.trazo.app.notifications.NotificationCenter
+import com.trazo.app.notifications.ReminderHistory
 import com.trazo.app.notifications.ReminderPreferences
+import com.trazo.app.notifications.ReminderSettings
+import com.trazo.app.notifications.ReminderStatus
 import com.trazo.app.data.AppSettings
 import com.trazo.app.data.ReviewInsights
 import com.trazo.app.data.ReviewSummary
@@ -166,12 +170,8 @@ fun TrazoApp(
         if (hapticsEnabled) hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
         viewModel.toggleHabit(id)
     }
-    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         NotificationCenter.createChannels(context)
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
     }
     val state by viewModel.state
     var section by remember { mutableStateOf(Section.TODAY) }
@@ -677,7 +677,7 @@ private fun SettingsSheet(
                 fontSize = 12.sp,
                 modifier = Modifier.padding(start = 24.dp, top = 8.dp)
             )
-            ReminderCard()
+            ReminderCard(state)
             Text("APARIENCIA Y ACCESIBILIDAD", color = Lavender, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Lavender.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
@@ -814,34 +814,223 @@ private fun RowScope.QuickAction(icon: TrazoIconKind, label: String, color: Colo
 }
 
 @Composable
-private fun ReminderCard() {
+private fun ReminderCard(state: TrazoState) {
     val context = LocalContext.current
-    var enabled by remember { mutableStateOf(ReminderPreferences.enabled(context)) }
-    var hour by remember { mutableIntStateOf(ReminderPreferences.hour(context)) }
+    var settings by remember { mutableStateOf(ReminderPreferences.load(context)) }
+    var statusRefresh by remember { mutableIntStateOf(0) }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        statusRefresh++
+        ReminderPreferences.save(context, settings)
+    }
+    val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        statusRefresh++
+        ReminderPreferences.save(context, settings)
+    }
+    fun persist(updated: ReminderSettings) {
+        settings = updated
+        ReminderPreferences.save(context, updated)
+        statusRefresh++
+    }
+    val notificationsReady = statusRefresh.let { NotificationCenter.canNotify(context) }
+    val itemChannelReady = statusRefresh.let { NotificationCenter.itemChannelEnabled(context) }
+    val exactReady = statusRefresh.let { NotificationCenter.canScheduleExact(context) }
+    val next = statusRefresh.let { ReminderStatus.nextScheduled(context, state) }
+    val last = statusRefresh.let { ReminderHistory.latest(context) }
+    val dateTimeFormat = remember { DateTimeFormatter.ofPattern("EEE d MMM · HH:mm", Locale.forLanguageTag("es-CL")) }
+
     Surface(
-        color = Leaf.copy(alpha = .10f), shape = RoundedCornerShape(15.dp),
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp).fillMaxWidth()
+        color = Leaf.copy(alpha = .10f),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp).fillMaxWidth().sketchBorder(Leaf.copy(alpha = .36f))
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TrazoIcon(TrazoIconKind.NOTIFICATION, color = Coral, size = 21.dp)
-                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                    Text("Resumen diario", fontWeight = FontWeight.Bold)
-                    Text(if (enabled) "Te avisaré a las %02d:00".format(hour) else "Recordatorios desactivados", color = MutedInk, fontSize = 13.sp)
+                TrazoIcon(TrazoIconKind.NOTIFICATION, color = Coral, size = 25.dp)
+                Column(Modifier.weight(1f).padding(horizontal = 11.dp)) {
+                    Text("Centro de avisos", fontWeight = FontWeight.Black, fontSize = 18.sp)
+                    Text(
+                        if (settings.masterEnabled) "Tú eliges qué merece interrumpirte." else "Todos los avisos están pausados.",
+                        color = MutedInk,
+                        fontSize = 12.sp
+                    )
                 }
-                TextButton(onClick = {
-                    enabled = !enabled
-                    ReminderPreferences.set(context, enabled, hour)
-                }) { Text(if (enabled) "Desactivar" else "Activar", color = if (enabled) MutedInk else Leaf) }
+                Switch(
+                    checked = settings.masterEnabled,
+                    onCheckedChange = { enabled ->
+                        persist(settings.copy(masterEnabled = enabled))
+                        if (enabled && Build.VERSION.SDK_INT >= 33 && !notificationsReady) {
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                )
             }
-            if (enabled) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                listOf(8, 12, 18).forEach { option ->
-                    Surface(
-                        onClick = { hour = option; ReminderPreferences.set(context, true, option) },
-                        color = if (hour == option) Leaf else Color.Transparent, shape = RoundedCornerShape(10.dp)
-                    ) { Text("%02d:00".format(option), color = if (hour == option) Color.White else MutedInk, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) }
+
+            NotificationHealthRow(
+                ready = notificationsReady && itemChannelReady,
+                readyText = "Notificaciones listas",
+                missingText = "Android está bloqueando los avisos",
+                action = if (notificationsReady) "Revisar canal" else "Permitir"
+            ) {
+                if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.POST_NOTIFICATIONS
+                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    settingsLauncher.launch(NotificationCenter.notificationSettingsIntent(context))
                 }
             }
+            NotificationHealthRow(
+                ready = exactReady,
+                readyText = "Alarmas puntuales habilitadas",
+                missingText = "Hora aproximada: Android puede retrasarlas",
+                action = if (exactReady || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) null else "Dar precisión"
+            ) {
+                settingsLauncher.launch(NotificationCenter.exactAlarmSettingsIntent(context))
+            }
+
+            if (settings.masterEnabled) {
+                Text("AVISOS PUNTUALES", color = Coral, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp, modifier = Modifier.padding(top = 13.dp, bottom = 3.dp))
+                ReminderSwitchRow("Tareas con fecha y hora", "Avisa incluso con la app cerrada.", settings.taskReminders) {
+                    persist(settings.copy(taskReminders = it))
+                }
+                ReminderSwitchRow("Hábitos programados", "Solo en sus días y si siguen pendientes.", settings.habitReminders) {
+                    persist(settings.copy(habitReminders = it))
+                }
+                ReminderSwitchRow("Recuperar avisos perdidos", "Si el teléfono estuvo apagado, recupera los de las últimas 6 h.", settings.recoverMissed) {
+                    persist(settings.copy(recoverMissed = it))
+                }
+
+                Text("RITMO DEL DÍA", color = Leaf, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp, modifier = Modifier.padding(top = 14.dp, bottom = 3.dp))
+                ReminderTimeRow(
+                    title = "Agenda de la mañana",
+                    subtitle = "Un resumen de lo pendiente para empezar.",
+                    enabled = settings.morningEnabled,
+                    hour = settings.morningHour,
+                    minute = settings.morningMinute,
+                    onEnabled = { persist(settings.copy(morningEnabled = it)) },
+                    onTime = { hour, minute -> persist(settings.copy(morningHour = hour, morningMinute = minute)) }
+                )
+                ReminderTimeRow(
+                    title = "Cierre del día",
+                    subtitle = "Un último vistazo sin castigos ni rachas rotas.",
+                    enabled = settings.eveningEnabled,
+                    hour = settings.eveningHour,
+                    minute = settings.eveningMinute,
+                    onEnabled = { persist(settings.copy(eveningEnabled = it)) },
+                    onTime = { hour, minute -> persist(settings.copy(eveningHour = hour, eveningMinute = minute)) }
+                )
+            }
+
+            Surface(
+                color = PaperRaised.copy(alpha = .72f),
+                shape = RoundedCornerShape(13.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 13.dp)
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Próximo aviso", color = MutedInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        when {
+                            !settings.masterEnabled -> "Pausado"
+                            !notificationsReady -> "Sin permiso para mostrarse"
+                            next == null -> "No hay ninguno programado"
+                            else -> next.format(dateTimeFormat).replaceFirstChar { it.uppercase() }
+                        },
+                        color = Ink,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    last?.let {
+                        val at = Instant.ofEpochMilli(it.atMillis).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                        Text("Último enviado: ${at.format(dateTimeFormat)} · ${it.title}", color = MutedInk, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+                    }
+                }
+            }
+
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TextButton(
+                    onClick = {
+                        testResult = if (NotificationCenter.postTest(context)) "Prueba enviada" else "Primero permite los avisos"
+                        statusRefresh++
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Probar ahora", color = Coral, fontWeight = FontWeight.Bold) }
+                TextButton(
+                    onClick = { settingsLauncher.launch(NotificationCenter.notificationSettingsIntent(context)) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Ajustes de Android", color = MutedInk) }
+            }
+            testResult?.let { Text(it, color = if (it == "Prueba enviada") Leaf else Coral, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally)) }
+        }
+    }
+}
+
+@Composable
+private fun NotificationHealthRow(
+    ready: Boolean,
+    readyText: String,
+    missingText: String,
+    action: String?,
+    onAction: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 9.dp).background(
+            if (ready) Leaf.copy(alpha = .10f) else Coral.copy(alpha = .11f), RoundedCornerShape(11.dp)
+        ).padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TrazoIcon(if (ready) TrazoIconKind.CHECK else TrazoIconKind.NOTIFICATION, color = if (ready) Leaf else Coral, size = 17.dp)
+        Text(if (ready) readyText else missingText, modifier = Modifier.weight(1f).padding(start = 8.dp), fontSize = 12.sp, color = Ink)
+        action?.let { TextButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 7.dp)) { Text(it, color = Coral, fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
+    }
+}
+
+@Composable
+private fun ReminderSwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(subtitle, color = MutedInk, fontSize = 11.sp)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun ReminderTimeRow(
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    hour: Int,
+    minute: Int,
+    onEnabled: (Boolean) -> Unit,
+    onTime: (Int, Int) -> Unit
+) {
+    var timeText by remember(hour, minute) { mutableStateOf("%02d:%02d".format(hour, minute)) }
+    val parsed = parseReminder(timeText)
+    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(subtitle, color = MutedInk, fontSize = 11.sp)
+            }
+            Switch(checked = enabled, onCheckedChange = onEnabled)
+        }
+        if (enabled) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = timeText,
+                onValueChange = { timeText = it.filter { char -> char.isDigit() || char == ':' }.take(5) },
+                label = { Text("Hora HH:MM") },
+                singleLine = true,
+                isError = timeText.length == 5 && parsed == null,
+                modifier = Modifier.weight(1f)
+            )
+            Button(
+                onClick = { parsed?.let { onTime(it.first, it.second) } },
+                enabled = parsed != null,
+                colors = ButtonDefaults.buttonColors(containerColor = Leaf)
+            ) { Text("Aplicar") }
         }
     }
 }
@@ -1376,10 +1565,29 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
             Text("Recordatorio", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 listOf(null, 8, 12, 18, 21).forEach { hour ->
-                    TimeChoice(if (hour == null) "No" else "%02d:00".format(hour), reminderHour == hour && reminderMinute == 0) { reminderHour = hour; reminderMinute = 0; reminderText = hour?.let { "%02d:00".format(it) }.orEmpty() }
+                    TimeChoice(if (hour == null) "No" else "%02d:00".format(hour), reminderHour == hour && reminderMinute == 0) {
+                        reminderHour = hour
+                        reminderMinute = 0
+                        reminderText = hour?.let { "%02d:00".format(it) }.orEmpty()
+                        if (hour != null && dueDate == null) {
+                            dueDate = if (LocalTime.of(hour, 0).isAfter(LocalTime.now())) LocalDate.now() else LocalDate.now().plusDays(1)
+                        }
+                    }
                 }
             }
-            OutlinedTextField(reminderText, { value -> reminderText = value.take(5); parseReminder(value)?.let { (h, m) -> reminderHour = h; reminderMinute = m } }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
+            OutlinedTextField(reminderText, { value ->
+                reminderText = value.take(5)
+                val parsed = parseReminder(value)
+                reminderHour = parsed?.first
+                parsed?.let { (h, m) ->
+                    reminderHour = h
+                    reminderMinute = m
+                    if (dueDate == null) {
+                        dueDate = if (LocalTime.of(h, m).isAfter(LocalTime.now())) LocalDate.now() else LocalDate.now().plusDays(1)
+                    }
+                }
+            }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
+            ReminderReadinessNote(reminderHour != null)
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
             SaveButton(if (task == null) "Guardar tarea" else "Guardar cambios", title.isNotBlank()) {
                 onSave(TaskInput(title, note, important, dueDate, reminderHour, reminderMinute, parseTags(tags)))
@@ -1538,7 +1746,13 @@ private fun HabitComposer(
                     TimeChoice(if (hour == null) "No" else "%02d:00".format(hour), reminderHour == hour && reminderMinute == 0) { reminderHour = hour; reminderMinute = 0; reminderText = hour?.let { "%02d:00".format(it) }.orEmpty() }
                 }
             }
-            OutlinedTextField(reminderText, { value -> reminderText = value.take(5); parseReminder(value)?.let { (h, m) -> reminderHour = h; reminderMinute = m } }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
+            OutlinedTextField(reminderText, { value ->
+                reminderText = value.take(5)
+                val parsed = parseReminder(value)
+                reminderHour = parsed?.first
+                parsed?.let { (h, m) -> reminderHour = h; reminderMinute = m }
+            }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
+            ReminderReadinessNote(reminderHour != null)
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
             Spacer(Modifier.height(22.dp))
             SaveButton(if (habit == null) "Crear hábito" else "Guardar cambios", title.isNotBlank() && days.isNotEmpty()) {
@@ -1573,6 +1787,51 @@ private fun HabitComposer(
 }
 
 private fun parseTags(value: String): Set<String> = value.split(',', ' ').mapNotNull { it.trim().removePrefix("#").lowercase().takeIf(String::isNotBlank) }.take(8).toSet()
+
+@Composable
+private fun ReminderReadinessNote(active: Boolean) {
+    if (!active) return
+    val context = LocalContext.current
+    var refresh by remember { mutableIntStateOf(0) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
+    val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh++ }
+    val canNotify = refresh.let { NotificationCenter.canNotify(context) }
+    val canDeliver = refresh.let { NotificationCenter.itemChannelEnabled(context) }
+    val exact = refresh.let { NotificationCenter.canScheduleExact(context) }
+    if (canDeliver && exact) {
+        Text("✓ Aviso listo y puntual", color = Leaf, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+        return
+    }
+    Surface(
+        color = Coral.copy(alpha = .10f),
+        shape = RoundedCornerShape(11.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+    ) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            TrazoIcon(TrazoIconKind.NOTIFICATION, color = Coral, size = 16.dp)
+            Text(
+                if (!canDeliver) "Android aún bloquea este aviso" else "Puede llegar con algunos minutos de retraso",
+                modifier = Modifier.weight(1f).padding(start = 7.dp),
+                color = Ink,
+                fontSize = 11.sp
+            )
+            TextButton(onClick = {
+                if (!canNotify && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.POST_NOTIFICATIONS
+                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else if (!canDeliver) {
+                    settingsLauncher.launch(NotificationCenter.notificationSettingsIntent(context))
+                } else {
+                    settingsLauncher.launch(NotificationCenter.exactAlarmSettingsIntent(context))
+                }
+            }, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                Text(if (!canDeliver) "Permitir" else "Precisar", color = Coral, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
 
 private fun parseReminder(value: String): Pair<Int, Int>? {
     val parts = value.split(':')

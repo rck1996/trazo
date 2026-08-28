@@ -28,10 +28,11 @@ class FocusWidget : AppWidgetProvider() {
             val session = FocusSessionStore.load(context)
             if (session == null) {
                 val task = LocalStore(context).load().tasks.firstOrNull { !it.completed && !it.archived && it.deletedAt == null }
+                val durationSeconds = (task?.durationMinutes ?: 25).coerceIn(1, 180) * 60
                 ContextCompat.startForegroundService(
                     context,
                     Intent(context, FocusTimerService::class.java).apply {
-                        putExtra(FocusTimerService.EXTRA_END_AT, System.currentTimeMillis() + DEFAULT_FOCUS_SECONDS * 1000L)
+                        putExtra(FocusTimerService.EXTRA_END_AT, System.currentTimeMillis() + durationSeconds * 1000L)
                         putExtra(FocusTimerService.EXTRA_TASK, task?.title)
                         putExtra(FocusTimerService.EXTRA_PHASE, "FOCUS")
                     }
@@ -49,8 +50,6 @@ class FocusWidget : AppWidgetProvider() {
 
     companion object {
         private const val ACTION_TOGGLE_FOCUS = "com.trazo.app.widget.TOGGLE_FOCUS"
-        private const val DEFAULT_FOCUS_SECONDS = 25 * 60
-
         fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, FocusWidget::class.java)
@@ -76,7 +75,8 @@ class FocusWidget : AppWidgetProvider() {
                 if (session == null) {
                     setViewVisibility(R.id.focus_widget_timer, View.GONE)
                     setViewVisibility(R.id.focus_widget_idle_time, View.VISIBLE)
-                    setTextViewText(R.id.focus_widget_action, "▶  Iniciar 25 min")
+                    val minutes = nextTask?.durationMinutes?.coerceIn(1, 180) ?: 25
+                    setTextViewText(R.id.focus_widget_action, "▶  Iniciar $minutes min")
                 } else {
                     val base = SystemClock.elapsedRealtime() + (session.endAt - System.currentTimeMillis())
                     setViewVisibility(R.id.focus_widget_timer, View.VISIBLE)

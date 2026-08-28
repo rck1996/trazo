@@ -707,7 +707,7 @@ private fun SettingsSheet(
                     StatCell(stats.minutes.toString(), "minutos")
                 }
             }
-            Text("ARCHIVADAS", color = Sky, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
+            Text("ARCHIVADAS · ${archivedTasks.size + archivedHabits.size}", color = Sky, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
                     Text("Se conservan completas, pero dejan de aparecer en tus listas.", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -717,7 +717,7 @@ private fun SettingsSheet(
                     }
                 }
             }
-            Text("PAPELERA", color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 8.dp))
+            Text("PAPELERA · ${deletedTasks.size + deletedHabits.size}", color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 8.dp))
             Surface(color = Coral.copy(alpha = .08f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
                     Text("Aquí quedan los elementos borrados hasta que decidas restaurarlos o eliminarlos para siempre.", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))

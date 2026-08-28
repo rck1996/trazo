@@ -207,6 +207,10 @@ private fun CalendarTaskRow(task: Task, onToggle: (String) -> Unit) {
             Checkbox(task.completed, { onToggle(task.id) }, colors = CheckboxDefaults.colors(checkedColor = Leaf))
             Column(Modifier.weight(1f)) {
                 Text(task.title, fontWeight = FontWeight.SemiBold, color = if (task.completed) MutedInk else Ink)
+                Text(
+                    "≈ ${if (task.durationMinutes >= 60) "${task.durationMinutes / 60} h" else "${task.durationMinutes} min"}",
+                    color = MutedInk, fontSize = 11.sp
+                )
                 if (task.note.isNotBlank()) Text(task.note, color = MutedInk, fontSize = 13.sp, maxLines = 1)
             }
         }

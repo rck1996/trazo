@@ -4,6 +4,7 @@ import com.trazo.app.HabitInput
 import com.trazo.app.TaskInput
 import com.trazo.app.model.HabitCategory
 import com.trazo.app.model.HabitUnit
+import com.trazo.app.model.TaskRecurrence
 import java.text.Normalizer
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -79,12 +80,28 @@ object SmartCaptureParser {
             SmartCaptureResult.TaskDraft(TaskInput(
                 title = cleanTitle,
                 important = important,
-                dueDate = dueDate ?: if (time != null) today else null,
+                dueDate = dueDate ?: if (time != null || extractTaskRecurrence(plain) != TaskRecurrence.NONE) today else null,
+                durationMinutes = extractDurationMinutes(plain),
+                recurrence = extractTaskRecurrence(plain),
                 reminderHour = time?.hour,
                 reminderMinute = time?.minute ?: 0,
                 tags = tags
             ))
         }
+    }
+
+    private fun extractDurationMinutes(text: String): Int =
+        Regex("\\b(\\d{1,3})\\s*(?:min(?:uto)?s?|h(?:ora)?s?)\\b")
+            .find(text)?.let { match ->
+                val amount = match.groupValues[1].toIntOrNull() ?: return@let null
+                if (match.value.contains("h")) amount * 60 else amount
+            }?.coerceIn(5, 480) ?: 25
+
+    private fun extractTaskRecurrence(text: String): TaskRecurrence = when {
+        Regex("\\bcada\\s+d[ií]a\\b|\\bdiari[oa]\\b").containsMatchIn(text) -> TaskRecurrence.DAILY
+        Regex("\\bcada\\s+semana\\b|\\bsemanal\\b").containsMatchIn(text) -> TaskRecurrence.WEEKLY
+        Regex("\\bcada\\s+mes\\b|\\bmensual\\b").containsMatchIn(text) -> TaskRecurrence.MONTHLY
+        else -> TaskRecurrence.NONE
     }
 
     private fun extractDays(text: String): Set<DayOfWeek> {
@@ -169,6 +186,8 @@ object SmartCaptureParser {
             .replace(Regex("(?i)\\b(?:pasado\\s+mañana|pasado\\s+manana|hoy|mañana|manana|importante|urgente|prioridad alta|tarea|hábito|habito|rutina|diario|diaria)\\b"), "")
             .replace(Regex("(?i)\\b(?:todos los días|todos los dias|cada día|cada dia|entre semana|fines? de semana|(?:de\\s+)?lunes\\s+a\\s+viernes)\\b"), "")
             .replace(Regex("(?i)\\bcada\\s+(?:dos|tres|cuatro|\\d+)\\s+semanas?\\b"), "")
+            .replace(Regex("(?i)\\bcada\\s+(?:día|dia|semana|mes)\\b"), "")
+            .replace(Regex("(?i)\\b(?:semanal|mensual)\\b"), "")
             .replace(Regex("(?i)\\bexcepto\\s+(?:el\\s+)?(?:lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\\b"), "")
             .replace(Regex("(?i)\\b(?:(?:cada|los|el)\\s+)?(?:lunes|lun|martes|mar|miércoles|miercoles|mie|jueves|jue|viernes|vie|sábado|sabado|sab|domingo|dom)\\b"), "")
             .replace(Regex("(?i)\\b(?:a\\s+las?|alas)\\s*\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?\\b"), "")

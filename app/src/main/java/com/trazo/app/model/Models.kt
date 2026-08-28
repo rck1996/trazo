@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 enum class TaskPriority { CALM, IMPORTANT }
+enum class TaskRecurrence { NONE, DAILY, WEEKLY, MONTHLY }
 
 enum class HabitCategory(val label: String, val symbol: String) {
     GENERAL("General", "✦"),
@@ -47,6 +48,9 @@ data class Task(
     val completedAt: Long? = null,
     val createdOn: LocalDate = LocalDate.now(),
     val dueDate: LocalDate? = null,
+    /** Estimated effort used by Planner and Pomodoro suggestions. */
+    val durationMinutes: Int = 25,
+    val recurrence: TaskRecurrence = TaskRecurrence.NONE,
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
     val tags: Set<String> = emptySet(),

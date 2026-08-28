@@ -15,6 +15,7 @@ import com.trazo.app.model.HabitProgress
 import com.trazo.app.model.HabitUnit
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
+import com.trazo.app.model.TaskRecurrence
 import com.trazo.app.model.TrazoState
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -24,6 +25,8 @@ data class TaskInput(
     val note: String = "",
     val important: Boolean = false,
     val dueDate: LocalDate? = null,
+    val durationMinutes: Int = 25,
+    val recurrence: TaskRecurrence = TaskRecurrence.NONE,
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
     val tags: Set<String> = emptySet()
@@ -71,6 +74,8 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
             title = input.title.trim(), note = input.note.trim(),
             priority = if (input.important) TaskPriority.IMPORTANT else TaskPriority.CALM,
             dueDate = input.dueDate,
+            durationMinutes = input.durationMinutes.coerceIn(5, 480),
+            recurrence = input.recurrence,
             reminderHour = input.reminderHour.takeIf { input.dueDate != null },
             reminderMinute = input.reminderMinute,
             tags = input.tags.cleanTags()
@@ -78,12 +83,23 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleTask(id: String) = update { state ->
-        state.copy(tasks = state.tasks.map { task ->
+        val updatedTasks = state.tasks.map { task ->
             if (task.id != id) task else {
                 val completed = !task.completed
                 task.copy(completed = completed, completedAt = if (completed) System.currentTimeMillis() else null)
             }
-        })
+        }
+        val completed = updatedTasks.firstOrNull { it.id == id }
+        val nextTask = completed?.takeIf { it.completed && it.recurrence != TaskRecurrence.NONE && it.dueDate != null }?.let { task ->
+            val nextDate = when (task.recurrence) {
+                TaskRecurrence.DAILY -> task.dueDate!!.plusDays(1)
+                TaskRecurrence.WEEKLY -> task.dueDate!!.plusWeeks(1)
+                TaskRecurrence.MONTHLY -> task.dueDate!!.plusMonths(1)
+                TaskRecurrence.NONE -> task.dueDate
+            }
+            task.copy(id = java.util.UUID.randomUUID().toString(), completed = false, completedAt = null, dueDate = nextDate, createdOn = LocalDate.now())
+        }
+        state.copy(tasks = updatedTasks + listOfNotNull(nextTask))
     }
 
     fun deleteTask(id: String) {
@@ -106,6 +122,8 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
                 title = input.title.trim(), note = input.note.trim(),
                 priority = if (input.important) TaskPriority.IMPORTANT else TaskPriority.CALM,
                 dueDate = input.dueDate,
+                durationMinutes = input.durationMinutes.coerceIn(5, 480),
+                recurrence = input.recurrence,
                 reminderHour = input.reminderHour.takeIf { input.dueDate != null },
                 reminderMinute = input.reminderMinute,
                 tags = input.tags.cleanTags()

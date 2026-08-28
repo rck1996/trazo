@@ -7,6 +7,7 @@ import com.trazo.app.model.HabitCategory
 import com.trazo.app.model.HabitUnit
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
+import com.trazo.app.model.TaskRecurrence
 import com.trazo.app.model.TrazoState
 import org.json.JSONArray
 import org.json.JSONObject
@@ -56,6 +57,8 @@ class LocalStore(private val context: Context) {
                     task.completedAt?.let { put("completedAt", it) }
                     put("createdOn", task.createdOn.toString())
                     task.dueDate?.let { put("dueDate", it.toString()) }
+                    put("durationMinutes", task.durationMinutes.coerceIn(5, 480))
+                    put("recurrence", task.recurrence.name)
                     task.reminderHour?.let { put("reminderHour", it) }
                     put("reminderMinute", task.reminderMinute)
                     put("tags", JSONArray(task.tags.toList()))
@@ -107,6 +110,9 @@ class LocalStore(private val context: Context) {
                     createdOn = LocalDate.parse(item.getString("createdOn")),
                     dueDate = item.optString("dueDate").takeIf { it.isNotBlank() }
                         ?.let(LocalDate::parse),
+                    durationMinutes = item.optInt("durationMinutes", 25).coerceIn(5, 480),
+                    recurrence = runCatching { TaskRecurrence.valueOf(item.optString("recurrence")) }
+                        .getOrDefault(TaskRecurrence.NONE),
                     reminderHour = item.optInt("reminderHour", -1).takeIf { it >= 0 },
                     reminderMinute = item.optInt("reminderMinute", 0),
                     tags = item.optJSONArray("tags").toStringSet(),

@@ -121,6 +121,7 @@ import com.trazo.app.model.HabitProgress
 import com.trazo.app.model.HabitUnit
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
+import com.trazo.app.model.TaskRecurrence
 import com.trazo.app.model.TaskSchedule
 import com.trazo.app.model.TrazoState
 import com.trazo.app.notifications.NotificationCenter
@@ -1313,6 +1314,10 @@ private fun TaskCard(
                     )
                     if (task.note.isNotBlank()) Text(task.note, color = MutedInk, fontSize = 13.sp, maxLines = 2)
                     if (task.tags.isNotEmpty()) Text(task.tags.joinToString("  ") { "#$it" }, color = Lavender, fontSize = 11.sp, maxLines = 1)
+                    Text(
+                        "≈ ${if (task.durationMinutes >= 60) "${task.durationMinutes / 60} h" else "${task.durationMinutes} min"}",
+                        color = MutedInk, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp)
+                    )
                     task.dueDate?.let { date ->
                         val today = LocalDate.now()
                         val label = when (date) {
@@ -1596,6 +1601,8 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
     var note by remember(task, draft) { mutableStateOf(task?.note ?: draft?.note.orEmpty()) }
     var important by remember(task, draft) { mutableStateOf(task?.priority == TaskPriority.IMPORTANT || draft?.important == true) }
     var dueDate by remember(task, draft, initialDate) { mutableStateOf(task?.dueDate ?: draft?.dueDate ?: initialDate) }
+    var durationMinutes by remember(task, draft) { mutableIntStateOf(task?.durationMinutes ?: draft?.durationMinutes ?: 25) }
+    var recurrence by remember(task, draft) { mutableStateOf(task?.recurrence ?: draft?.recurrence ?: TaskRecurrence.NONE) }
     var reminderHour by remember(task, draft) { mutableStateOf(task?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(task, draft) { mutableIntStateOf(task?.reminderMinute ?: draft?.reminderMinute ?: 0) }
     var reminderText by remember(task, draft) { mutableStateOf((task?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, task?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
@@ -1610,12 +1617,54 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = note, onValueChange = { note = it }, label = { Text("Una nota (opcional)") },
+                OutlinedTextField(
+                    value = note, onValueChange = { note = it }, label = { Text("Una nota (opcional)") },
                 modifier = Modifier.fillMaxWidth(), maxLines = 3,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
-            )
+                )
+                Text("Duración estimada", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(15, 25, 45, 60, 90).forEach { minutes ->
+                        val selected = durationMinutes == minutes
+                        Surface(
+                            onClick = { durationMinutes = minutes },
+                            color = if (selected) Coral else PaperRaised.copy(alpha = .72f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                if (minutes >= 60) "${minutes / 60} h" else "$minutes min",
+                                color = if (selected) Color.White else Ink,
+                                fontSize = 11.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+                Text("Repetición", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf(
+                        TaskRecurrence.NONE to "Nunca",
+                        TaskRecurrence.DAILY to "Diaria",
+                        TaskRecurrence.WEEKLY to "Semanal",
+                        TaskRecurrence.MONTHLY to "Mensual"
+                    ).forEach { (value, label) ->
+                        val selected = recurrence == value
+                        Surface(
+                            onClick = { recurrence = value },
+                            color = if (selected) Leaf else PaperRaised.copy(alpha = .72f),
+                            shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f)
+                        ) {
+                            Text(label, color = if (selected) Color.White else Ink, fontSize = 10.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                    }
+                }
             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { important = !important }.padding(vertical = 8.dp),
@@ -1661,7 +1710,9 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
             ReminderReadinessNote(reminderHour != null)
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
             SaveButton(if (task == null) "Guardar tarea" else "Guardar cambios", title.isNotBlank()) {
-                onSave(TaskInput(title, note, important, dueDate, reminderHour, reminderMinute, parseTags(tags)))
+                onSave(TaskInput(title = title, note = note, important = important, dueDate = dueDate,
+                    durationMinutes = durationMinutes, recurrence = recurrence, reminderHour = reminderHour,
+                    reminderMinute = reminderMinute, tags = parseTags(tags)))
             }
         }
     }

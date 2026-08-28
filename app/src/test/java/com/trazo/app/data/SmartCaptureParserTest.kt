@@ -2,6 +2,7 @@ package com.trazo.app.data
 
 import com.trazo.app.model.HabitCategory
 import com.trazo.app.model.HabitUnit
+import com.trazo.app.model.TaskRecurrence
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,6 +21,21 @@ class SmartCaptureParserTest {
         assertEquals(30, result.input.reminderMinute)
         assertTrue(result.input.important)
         assertEquals(setOf("trabajo"), result.input.tags)
+    }
+
+    @Test fun parsesTaskDurationForPlanner() {
+        val result = SmartCaptureParser.parse("Tarea Preparar presentación mañana 90 minutos", today)
+            as SmartCaptureResult.TaskDraft
+        assertEquals("Preparar presentación", result.input.title)
+        assertEquals(90, result.input.durationMinutes)
+    }
+
+    @Test fun parsesRecurringTaskWithoutTurningItIntoAHabit() {
+        val result = SmartCaptureParser.parse("Tarea pagar internet cada mes", today)
+            as SmartCaptureResult.TaskDraft
+        assertEquals("pagar internet", result.input.title)
+        assertEquals(TaskRecurrence.MONTHLY, result.input.recurrence)
+        assertEquals(today, result.input.dueDate)
     }
 
     @Test fun detectsDailyHabitAndCategory() {

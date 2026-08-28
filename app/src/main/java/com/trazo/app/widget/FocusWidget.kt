@@ -44,6 +44,9 @@ class FocusWidget : AppWidgetProvider() {
                         .putExtra(FocusTimerService.EXTRA_RESET_UI, true)
                 )
             }
+            // Reflect the new session immediately instead of waiting for the
+            // periodic widget refresh.
+            updateAll(context)
         }
         super.onReceive(context, intent)
     }

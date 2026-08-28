@@ -216,7 +216,18 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
         }
         if (pending.isEmpty()) item { Text("No hay tareas pendientes.", color = MutedInk, modifier = Modifier.padding(24.dp)) }
         items(pending.take(8), key = { it.id }) { task ->
-            FocusTask(task, task.id == selectedTaskId) { selectedTaskId = if (selectedTaskId == task.id) null else task.id }
+            FocusTask(task, task.id == selectedTaskId) {
+                if (running) return@FocusTask
+                val selecting = selectedTaskId != task.id
+                selectedTaskId = if (selecting) task.id else null
+                // A task carries its own estimate. Use it as the focus block so
+                // long tasks no longer look disconnected from the Pomodoro.
+                if (selecting) {
+                    focusMinutes = task.durationMinutes.coerceIn(1, 180)
+                    phaseName = FocusPhase.FOCUS.name
+                    remaining = focusMinutes * 60
+                }
+            }
         }
         if (selectedTask != null) item {
             TextButton(onClick = { onTaskComplete(selectedTask.id); selectedTaskId = null }, modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth()) {

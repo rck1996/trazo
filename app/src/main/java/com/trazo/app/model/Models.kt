@@ -51,11 +51,18 @@ data class Task(
     /** Estimated effort used by Planner and Pomodoro suggestions. */
     val durationMinutes: Int = 25,
     val recurrence: TaskRecurrence = TaskRecurrence.NONE,
+    val subtasks: List<TaskSubtask> = emptyList(),
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
     val tags: Set<String> = emptySet(),
     val archived: Boolean = false,
     val deletedAt: Long? = null
+)
+
+data class TaskSubtask(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val completed: Boolean = false
 )
 
 data class Habit(

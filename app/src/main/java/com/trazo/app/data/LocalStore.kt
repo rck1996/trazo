@@ -8,6 +8,7 @@ import com.trazo.app.model.HabitUnit
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
 import com.trazo.app.model.TaskRecurrence
+import com.trazo.app.model.TaskSubtask
 import com.trazo.app.model.TrazoState
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,6 +60,7 @@ class LocalStore(private val context: Context) {
                     task.dueDate?.let { put("dueDate", it.toString()) }
                     put("durationMinutes", task.durationMinutes.coerceIn(5, 480))
                     put("recurrence", task.recurrence.name)
+                    put("subtasks", JSONArray(task.subtasks.map { JSONObject().apply { put("id", it.id); put("title", it.title); put("completed", it.completed) } }))
                     task.reminderHour?.let { put("reminderHour", it) }
                     put("reminderMinute", task.reminderMinute)
                     put("tags", JSONArray(task.tags.toList()))
@@ -113,6 +115,13 @@ class LocalStore(private val context: Context) {
                     durationMinutes = item.optInt("durationMinutes", 25).coerceIn(5, 480),
                     recurrence = runCatching { TaskRecurrence.valueOf(item.optString("recurrence")) }
                         .getOrDefault(TaskRecurrence.NONE),
+                    subtasks = buildList {
+                        val items = item.optJSONArray("subtasks") ?: JSONArray()
+                        for (subIndex in 0 until items.length()) {
+                            val sub = items.optJSONObject(subIndex) ?: continue
+                            add(TaskSubtask(sub.optString("id").ifBlank { java.util.UUID.randomUUID().toString() }, sub.optString("title"), sub.optBoolean("completed")))
+                        }
+                    }.filter { it.title.isNotBlank() },
                     reminderHour = item.optInt("reminderHour", -1).takeIf { it >= 0 },
                     reminderMinute = item.optInt("reminderMinute", 0),
                     tags = item.optJSONArray("tags").toStringSet(),

@@ -122,6 +122,7 @@ import com.trazo.app.model.HabitUnit
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
 import com.trazo.app.model.TaskRecurrence
+import com.trazo.app.model.TaskSubtask
 import com.trazo.app.model.TaskSchedule
 import com.trazo.app.model.TrazoState
 import com.trazo.app.notifications.NotificationCenter
@@ -1603,6 +1604,7 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
     var dueDate by remember(task, draft, initialDate) { mutableStateOf(task?.dueDate ?: draft?.dueDate ?: initialDate) }
     var durationMinutes by remember(task, draft) { mutableIntStateOf(task?.durationMinutes ?: draft?.durationMinutes ?: 25) }
     var recurrence by remember(task, draft) { mutableStateOf(task?.recurrence ?: draft?.recurrence ?: TaskRecurrence.NONE) }
+    var subtasksText by remember(task, draft) { mutableStateOf(task?.subtasks?.joinToString("\n") { it.title } ?: draft?.subtasks?.joinToString("\n") { it.title } ?: "") }
     var reminderHour by remember(task, draft) { mutableStateOf(task?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(task, draft) { mutableIntStateOf(task?.reminderMinute ?: draft?.reminderMinute ?: 0) }
     var reminderText by remember(task, draft) { mutableStateOf((task?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, task?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
@@ -1622,6 +1624,12 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
                 modifier = Modifier.fillMaxWidth(), maxLines = 3,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+                )
+                OutlinedTextField(
+                    value = subtasksText, onValueChange = { subtasksText = it },
+                    label = { Text("Subtareas (una por línea)") },
+                    placeholder = { Text("Preparar materiales\nRevisar resultado") },
+                    minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 )
                 Text("Duración estimada", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
                 Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1712,7 +1720,8 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
             SaveButton(if (task == null) "Guardar tarea" else "Guardar cambios", title.isNotBlank()) {
                 onSave(TaskInput(title = title, note = note, important = important, dueDate = dueDate,
                     durationMinutes = durationMinutes, recurrence = recurrence, reminderHour = reminderHour,
-                    reminderMinute = reminderMinute, tags = parseTags(tags)))
+                    reminderMinute = reminderMinute, tags = parseTags(tags),
+                    subtasks = subtasksText.lines().mapNotNull { it.trim().takeIf(String::isNotBlank) }.map { TaskSubtask(title = it) }))
             }
         }
     }

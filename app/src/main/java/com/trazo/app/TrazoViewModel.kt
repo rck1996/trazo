@@ -16,6 +16,7 @@ import com.trazo.app.model.HabitUnit
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
 import com.trazo.app.model.TaskRecurrence
+import com.trazo.app.model.TaskSubtask
 import com.trazo.app.model.TrazoState
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -27,6 +28,7 @@ data class TaskInput(
     val dueDate: LocalDate? = null,
     val durationMinutes: Int = 25,
     val recurrence: TaskRecurrence = TaskRecurrence.NONE,
+    val subtasks: List<TaskSubtask> = emptyList(),
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
     val tags: Set<String> = emptySet()
@@ -76,6 +78,7 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
             dueDate = input.dueDate,
             durationMinutes = input.durationMinutes.coerceIn(5, 480),
             recurrence = input.recurrence,
+            subtasks = input.subtasks,
             reminderHour = input.reminderHour.takeIf { input.dueDate != null },
             reminderMinute = input.reminderMinute,
             tags = input.tags.cleanTags()
@@ -124,6 +127,7 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
                 dueDate = input.dueDate,
                 durationMinutes = input.durationMinutes.coerceIn(5, 480),
                 recurrence = input.recurrence,
+                subtasks = input.subtasks,
                 reminderHour = input.reminderHour.takeIf { input.dueDate != null },
                 reminderMinute = input.reminderMinute,
                 tags = input.tags.cleanTags()

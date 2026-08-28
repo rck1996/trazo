@@ -31,6 +31,9 @@ class TaskListWidget : AppWidgetProvider() {
                 store.save(state.copy(tasks = state.tasks.map { task ->
                     if (task.id == taskId) task.copy(completed = true, completedAt = System.currentTimeMillis()) else task
                 }))
+                // Remove the completed row immediately so the launcher never
+                // shows a stale task after the checkbox is tapped.
+                updateAll(context)
             }
         }
         super.onReceive(context, intent)

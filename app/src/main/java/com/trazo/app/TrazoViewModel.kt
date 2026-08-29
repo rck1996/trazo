@@ -107,7 +107,7 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
             name = clean, title = input.title.trim(), note = input.note.trim(),
             priority = if (input.important) TaskPriority.IMPORTANT else TaskPriority.CALM,
             durationMinutes = input.durationMinutes.coerceIn(5, 480), recurrence = input.recurrence,
-            categoryId = input.categoryId, subtasks = input.subtasks.map { it.copy(id = java.util.UUID.randomUUID().toString(), completed = false) },
+            categoryId = input.categoryId, subtasks = input.subtasks.resetForReuse(),
             reminderHour = input.reminderHour, reminderMinute = input.reminderMinute,
             reminderMode = input.reminderMode, tags = input.tags.cleanTags()
         )) }
@@ -122,7 +122,7 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
         important = template.priority == TaskPriority.IMPORTANT,
         durationMinutes = template.durationMinutes, recurrence = template.recurrence,
         categoryId = template.categoryId,
-        subtasks = template.subtasks.map { it.copy(id = java.util.UUID.randomUUID().toString(), completed = false) },
+        subtasks = template.subtasks.resetForReuse(),
         reminderHour = template.reminderHour, reminderMinute = template.reminderMinute,
         reminderMode = template.reminderMode, tags = template.tags
     )
@@ -359,4 +359,15 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
     private fun Set<String>.cleanTags(): Set<String> = mapNotNull {
         it.trim().lowercase().takeIf(String::isNotBlank)
     }.take(8).toSet()
+
+    private fun List<TaskSubtask>.resetForReuse(): List<TaskSubtask> {
+        val newIds = associate { it.id to java.util.UUID.randomUUID().toString() }
+        return map { subtask ->
+            subtask.copy(
+                id = newIds.getValue(subtask.id),
+                completed = false,
+                dependsOnId = subtask.dependsOnId?.let(newIds::get)
+            )
+        }
+    }
 }

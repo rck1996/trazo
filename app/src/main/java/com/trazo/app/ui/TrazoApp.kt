@@ -1522,23 +1522,28 @@ internal fun TaskChecklist(
             modifier = Modifier.padding(bottom = 2.dp)
         )
         visibleItems.forEach { subtask ->
+            val dependency = subtask.dependsOnId?.let { id -> task.subtasks.firstOrNull { it.id == id } }
+            val blocked = dependency != null && !dependency.completed && !subtask.completed
             Row(
-                Modifier.fillMaxWidth().clickable { onSubtaskToggle(task.id, subtask.id) }.padding(vertical = 1.dp),
+                Modifier.fillMaxWidth().clickable(enabled = !blocked) { onSubtaskToggle(task.id, subtask.id) }.padding(vertical = 1.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Checkbox(
                     checked = subtask.completed,
                     onCheckedChange = { onSubtaskToggle(task.id, subtask.id) },
+                    enabled = !blocked,
                     colors = CheckboxDefaults.colors(checkedColor = Leaf),
                     modifier = Modifier.size(30.dp)
                 )
-                Text(
-                    subtask.title,
-                    color = if (subtask.completed) MutedInk else Ink,
-                    textDecoration = if (subtask.completed) TextDecoration.LineThrough else null,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(start = 5.dp)
-                )
+                Column(Modifier.padding(start = 5.dp)) {
+                    Text(
+                        subtask.title,
+                        color = if (subtask.completed || blocked) MutedInk else Ink,
+                        textDecoration = if (subtask.completed) TextDecoration.LineThrough else null,
+                        fontSize = 13.sp
+                    )
+                    if (blocked) Text("↳ Bloqueada hasta completar «${dependency?.title}»", color = Coral, fontSize = 10.sp)
+                }
             }
         }
         if (compact && task.subtasks.size > visibleItems.size) {
@@ -1807,7 +1812,9 @@ private fun TaskComposer(
     var durationMinutes by remember(task, draft) { mutableIntStateOf(task?.durationMinutes ?: draft?.durationMinutes ?: 25) }
     var recurrence by remember(task, draft) { mutableStateOf(task?.recurrence ?: draft?.recurrence ?: TaskRecurrence.NONE) }
     var categoryId by remember(task, draft) { mutableStateOf(task?.categoryId ?: draft?.categoryId ?: "general") }
-    var subtasksText by remember(task, draft) { mutableStateOf(task?.subtasks?.joinToString("\n") { it.title } ?: draft?.subtasks?.joinToString("\n") { it.title } ?: "") }
+    val initialSubtasks = task?.subtasks ?: draft?.subtasks.orEmpty()
+    var subtasks by remember(task, draft) { mutableStateOf(initialSubtasks) }
+    var subtasksText by remember(task, draft) { mutableStateOf(initialSubtasks.joinToString("\n") { it.title }) }
     var reminderHour by remember(task, draft) { mutableStateOf(task?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(task, draft) { mutableIntStateOf(task?.reminderMinute ?: draft?.reminderMinute ?: 0) }
     var reminderMode by remember(task, draft) { mutableStateOf(task?.reminderMode ?: draft?.reminderMode) }
@@ -1827,7 +1834,8 @@ private fun TaskComposer(
                             important = template.priority == TaskPriority.IMPORTANT
                             durationMinutes = template.durationMinutes; recurrence = template.recurrence
                             categoryId = template.categoryId
-                            subtasksText = template.subtasks.joinToString("\n") { it.title }
+                            subtasks = cloneTemplateSubtasks(template.subtasks)
+                            subtasksText = subtasks.joinToString("\n") { it.title }
                             reminderHour = template.reminderHour; reminderMinute = template.reminderMinute
                             reminderMode = template.reminderMode; tags = template.tags.joinToString(", ")
                             reminderText = template.reminderHour?.let { "%02d:%02d".format(it, template.reminderMinute) }.orEmpty()
@@ -1859,11 +1867,38 @@ private fun TaskComposer(
                     }
                 }
                 OutlinedTextField(
-                    value = subtasksText, onValueChange = { subtasksText = it },
+                    value = subtasksText, onValueChange = { value ->
+                        subtasksText = value
+                        subtasks = reconcileComposerSubtasks(value, subtasks)
+                    },
                     label = { Text("Subtareas (una por línea)") },
                     placeholder = { Text("Preparar materiales\nRevisar resultado") },
                     minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 )
+                if (subtasks.size > 1) {
+                    Text("Dependencias", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 9.dp))
+                    Text("Toca cada relación para cambiar qué paso debe terminar primero.", color = MutedInk, fontSize = 10.sp)
+                    subtasks.drop(1).forEachIndexed { offset, subtask ->
+                        val index = offset + 1
+                        val candidates = listOf<TaskSubtask?>(null) + subtasks.take(index)
+                        val selectedIndex = candidates.indexOfFirst { it?.id == subtask.dependsOnId }.coerceAtLeast(0)
+                        val dependency = candidates[selectedIndex]
+                        Surface(
+                            onClick = {
+                                val next = candidates[(selectedIndex + 1) % candidates.size]
+                                subtasks = subtasks.map { if (it.id == subtask.id) it.copy(dependsOnId = next?.id) else it }
+                            },
+                            color = if (dependency == null) Ink.copy(alpha = .05f) else Coral.copy(alpha = .10f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 5.dp)
+                        ) {
+                            Column(Modifier.padding(horizontal = 11.dp, vertical = 8.dp)) {
+                                Text(subtask.title, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                Text(dependency?.let { "↳ Después de: ${it.title}" } ?: "↳ Sin dependencia", color = if (dependency == null) MutedInk else Coral, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
                 Text("Duración estimada", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
                 Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(15, 25, 45, 60, 90).forEach { minutes ->
@@ -1957,7 +1992,7 @@ private fun TaskComposer(
             if (task == null && title.isNotBlank()) {
                 TextButton(onClick = {
                     onSaveTemplate(title, TaskInput(title, note, important, dueDate, durationMinutes, recurrence, categoryId,
-                        subtasksText.lines().mapNotNull { it.trim().takeIf(String::isNotBlank) }.map { TaskSubtask(title = it) },
+                        subtasks,
                         reminderHour, reminderMinute, reminderMode, criticalAlarm, parseTags(tags)))
                 }, modifier = Modifier.fillMaxWidth()) { Text("Guardar configuración como plantilla", color = Leaf) }
             }
@@ -1966,7 +2001,7 @@ private fun TaskComposer(
                     durationMinutes = durationMinutes, recurrence = recurrence, categoryId = categoryId, reminderHour = reminderHour,
                     reminderMinute = reminderMinute, reminderMode = reminderMode.takeIf { reminderHour != null }, tags = parseTags(tags),
                     criticalAlarm = criticalAlarm && reminderHour != null,
-                    subtasks = subtasksText.lines().mapNotNull { it.trim().takeIf(String::isNotBlank) }.map { TaskSubtask(title = it) }))
+                    subtasks = subtasks))
             }
         }
     }
@@ -1984,6 +2019,26 @@ private fun TaskComposer(
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") } }
         ) { DatePicker(pickerState) }
+    }
+}
+
+private fun reconcileComposerSubtasks(text: String, previous: List<TaskSubtask>): List<TaskSubtask> {
+    val titles = text.lines().mapNotNull { it.trim().takeIf(String::isNotBlank) }
+    val updated = titles.mapIndexed { index, title ->
+        previous.getOrNull(index)?.copy(title = title) ?: TaskSubtask(title = title)
+    }
+    val validIds = updated.mapTo(mutableSetOf()) { it.id }
+    return updated.map { if (it.dependsOnId in validIds) it else it.copy(dependsOnId = null) }
+}
+
+private fun cloneTemplateSubtasks(source: List<TaskSubtask>): List<TaskSubtask> {
+    val newIds = source.associate { it.id to java.util.UUID.randomUUID().toString() }
+    return source.map { subtask ->
+        subtask.copy(
+            id = newIds.getValue(subtask.id),
+            completed = false,
+            dependsOnId = subtask.dependsOnId?.let(newIds::get)
+        )
     }
 }
 

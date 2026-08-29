@@ -1,5 +1,11 @@
 # Cambios
 
+## 3.6.1
+
+- Editor visual de dependencias entre subtareas: cada paso puede depender de cualquiera de los pasos anteriores.
+- Las tarjetas explican qué subtarea mantiene bloqueado un paso y evitan marcarlo antes de tiempo.
+- Las dependencias se conservan correctamente al editar, guardar o reutilizar plantillas.
+
 ## 3.6.0
 
 - Planner diario con bloques arrastrables entre horas y días, ajuste cada 15 minutos y vista previa antes de soltar.

@@ -46,7 +46,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -108,7 +107,18 @@ internal fun CalendarScreen(
             label = "calendar mode"
         ) { currentMode ->
             when (currentMode) {
-                CalendarMode.DAY -> DayAgenda(selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle, onHabitExceptionToggle, onSubtaskToggle, onTaskReschedule, onAddTask)
+                CalendarMode.DAY -> DayAgenda(
+                    selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle,
+                    onHabitExceptionToggle, onSubtaskToggle,
+                    { id, newDate, hour, minute ->
+                        onTaskReschedule(id, newDate, hour, minute)
+                        if (newDate != selectedDate) {
+                            selectedDate = newDate
+                            visibleMonth = YearMonth.from(newDate)
+                        }
+                    },
+                    onAddTask
+                )
                 CalendarMode.PLANNER -> WeekPlanner(selectedDate, tasks, habits, padding, onTaskToggle) {
                     selectedDate = it
                     visibleMonth = YearMonth.from(it)
@@ -261,37 +271,44 @@ private fun TimedTaskBlock(
     val start = LocalTime.of(hour, minute)
     val end = start.plusMinutes(task.durationMinutes.toLong())
     val density = LocalDensity.current
-    var dragOffset by remember(task.id, date, hour, minute) { mutableStateOf(Offset.Zero) }
+    val dragOffset = remember(task.id, date, hour, minute) { mutableStateOf(Offset.Zero) }
     var dragging by remember(task.id) { mutableStateOf(false) }
-    var blockWidth by remember(task.id) { mutableStateOf(1f) }
     val pixelsPerMinute = with(density) { 1.2.dp.toPx() }
-    val dayWidth = (blockWidth * .72f).coerceAtLeast(with(density) { 96.dp.toPx() })
-    val drop = plannerDrop(date, hour, minute, dragOffset.x, dragOffset.y, dayWidth, pixelsPerMinute)
+    // A short horizontal gesture is enough to cross one day; the previous
+    // card-width threshold made this practically unreachable on phones.
+    val pixelsPerDay = with(density) { 96.dp.toPx() }
+    val drop = plannerDrop(date, hour, minute, dragOffset.value.x, dragOffset.value.y, pixelsPerDay, pixelsPerMinute)
     val previewStart = LocalTime.of(drop.hour, drop.minute)
     val previewEnd = previewStart.plusMinutes(task.durationMinutes.toLong())
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 5.dp)
-            .onSizeChanged { blockWidth = it.width.toFloat() }
             .zIndex(if (dragging) 2f else 0f)
             .graphicsLayer {
-                translationX = if (dragging) dragOffset.x * .18f else 0f
-                translationY = if (dragging) dragOffset.y * .18f else 0f
+                translationX = if (dragging) dragOffset.value.x * .55f else 0f
+                translationY = if (dragging) dragOffset.value.y * .55f else 0f
                 alpha = if (dragging) .88f else 1f
             }
-            .pointerInput(task.id, date, hour, minute, dayWidth, pixelsPerMinute) {
+            .pointerInput(task.id, date, hour, minute, pixelsPerDay, pixelsPerMinute) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { dragging = true },
-                    onDragCancel = { dragging = false; dragOffset = Offset.Zero },
+                    onDragCancel = { dragging = false; dragOffset.value = Offset.Zero },
                     onDragEnd = {
-                        if (drop.date != date || drop.hour != hour || drop.minute != minute) {
-                            onReschedule(task.id, drop.date, drop.hour, drop.minute)
+                        // Calculate from the final gesture here. Capturing `drop`
+                        // from composition could use the initial Offset.Zero.
+                        val finalDrop = plannerDrop(
+                            date, hour, minute,
+                            dragOffset.value.x, dragOffset.value.y,
+                            pixelsPerDay, pixelsPerMinute
+                        )
+                        if (finalDrop.date != date || finalDrop.hour != hour || finalDrop.minute != minute) {
+                            onReschedule(task.id, finalDrop.date, finalDrop.hour, finalDrop.minute)
                         }
                         dragging = false
-                        dragOffset = Offset.Zero
+                        dragOffset.value = Offset.Zero
                     },
                     onDrag = { change, amount ->
                         change.consume()
-                        dragOffset += amount
+                        dragOffset.value += amount
                     }
                 )
             },

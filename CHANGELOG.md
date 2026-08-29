@@ -1,5 +1,12 @@
 # Cambios
 
+## 3.6.4
+
+- El arrastre usa la posición final real al soltar, evitando movimientos que no se guardaban.
+- Umbral horizontal reducido para cambiar de día con un gesto cómodo.
+- La tarjeta acompaña el dedo con mayor claridad y conserva el ajuste vertical cada 15 minutos.
+- Al cambiar de fecha, la agenda abre automáticamente el día de destino para mantener la tarea visible.
+
 ## 3.6.3
 
 - Corrección responsive de los bloques horarios cortos en Agenda diaria.

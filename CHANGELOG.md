@@ -1,5 +1,13 @@
 # Cambios
 
+## 3.7.1
+
+- Mes convertido en mapa de carga con intensidad visual según el trabajo pendiente de cada día.
+- Progreso compacto de tareas, hábitos y subtareas directamente dentro de las fechas.
+- Selección de fecha sin abandonar la vista mensual.
+- Resumen inferior del día con tiempo pendiente, próximos títulos y acceso explícito a Agenda diaria.
+- Leyenda visual para distinguir tareas y hábitos sin añadir ruido.
+
 ## 3.7.0
 
 - Semana convertida en cuadrícula horaria desplazable por días y horas, reemplazando la antigua lista duplicada.

@@ -102,8 +102,10 @@ internal fun CalendarScreen(
         )
         ModeSelector(mode) { mode = it }
         CalendarGuide(mode)
-        PlanningSummary(selectedDate, tasks)
-        UnscheduledTray(tasks.filter { !it.completed && it.dueDate == null }, selectedDate, onTaskReschedule, onEditTask)
+        if (mode != CalendarMode.MONTH) {
+            PlanningSummary(selectedDate, tasks)
+            UnscheduledTray(tasks.filter { !it.completed && it.dueDate == null }, selectedDate, onTaskReschedule, onEditTask)
+        }
         AnimatedContent(
             modifier = Modifier.weight(1f),
             targetState = mode,
@@ -131,10 +133,11 @@ internal fun CalendarScreen(
                     visibleMonth = YearMonth.from(it)
                     mode = CalendarMode.DAY
                 }
-                CalendarMode.MONTH -> MonthGrid(visibleMonth, selectedDate, tasks, habits, padding) {
-                    selectedDate = it
-                    mode = CalendarMode.DAY
-                }
+                CalendarMode.MONTH -> MonthGrid(
+                    visibleMonth, selectedDate, tasks, habits, padding,
+                    onSelect = { selectedDate = it },
+                    onOpenDay = { mode = CalendarMode.DAY }
+                )
             }
         }
     }
@@ -612,7 +615,7 @@ private fun WeekDayColumn(
 @Composable
 private fun MonthGrid(
     month: YearMonth, selected: LocalDate, tasks: List<Task>, habits: List<Habit>,
-    padding: PaddingValues, onSelect: (LocalDate) -> Unit
+    padding: PaddingValues, onSelect: (LocalDate) -> Unit, onOpenDay: () -> Unit
 ) {
     val first = month.atDay(1)
     val leading = first.dayOfWeek.value - 1
@@ -620,6 +623,8 @@ private fun MonthGrid(
     val rows = cells.chunked(7)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = padding.calculateBottomPadding() + 96.dp)) {
         item {
+            MonthLegend()
+            Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth()) {
                 listOf("L", "M", "X", "J", "V", "S", "D").forEach { Text(it, modifier = Modifier.weight(1f), color = MutedInk, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
             }
@@ -628,37 +633,137 @@ private fun MonthGrid(
         items(rows) { week ->
             Row(Modifier.fillMaxWidth()) {
                 (week + List(7 - week.size) { null }).forEach { date ->
-                    if (date == null) Spacer(Modifier.weight(1f).height(76.dp))
-                    else MonthCell(
-                        date, date == selected, date == LocalDate.now(),
-                        tasks.count { it.dueDate == date },
-                        habits.count { HabitProgress.isScheduled(it, date) },
-                        Modifier.weight(1f), onSelect
-                    )
+                    if (date == null) Spacer(Modifier.weight(1f).height(56.dp))
+                    else {
+                        val dayTasks = TaskSchedule.onDate(tasks, date)
+                        val dayHabits = habits.filter { HabitProgress.isScheduled(it, date) }
+                        MonthCell(
+                            date = date,
+                            selected = date == selected,
+                            today = date == LocalDate.now(),
+                            tasks = dayTasks,
+                            habits = dayHabits,
+                            modifier = Modifier.weight(1f),
+                            onSelect = onSelect
+                        )
+                    }
                 }
+            }
+        }
+        item {
+            Spacer(Modifier.height(12.dp))
+            MonthDaySummary(selected, tasks, habits, onOpenDay)
+        }
+    }
+}
+
+@Composable
+private fun MonthLegend() {
+    Row(
+        Modifier.fillMaxWidth().background(Ink.copy(alpha = .04f), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("CARGA DEL MES", color = MutedInk, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+        Spacer(Modifier.weight(1f))
+        Text("● Tareas", color = Coral, fontSize = 10.sp)
+        Text("● Hábitos", color = Leaf, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun MonthCell(
+    date: LocalDate,
+    selected: Boolean,
+    today: Boolean,
+    tasks: List<Task>,
+    habits: List<Habit>,
+    modifier: Modifier,
+    onSelect: (LocalDate) -> Unit
+) {
+    val totalItems = tasks.count { !it.completed } + habits.count { !HabitProgress.isComplete(it, date) }
+    val loadAlpha = when {
+        totalItems >= 6 -> .22f
+        totalItems >= 4 -> .15f
+        totalItems >= 2 -> .09f
+        totalItems == 1 -> .045f
+        else -> 0f
+    }
+    val subtaskTotal = tasks.sumOf { it.subtasks.size }
+    val subtaskDone = tasks.sumOf { task -> task.subtasks.count { it.completed } }
+    val completedItems = tasks.count { it.completed } + habits.count { HabitProgress.isComplete(it, date) }
+    val allItems = tasks.size + habits.size
+    Column(
+        modifier.height(56.dp).padding(2.dp).clip(RoundedCornerShape(11.dp))
+            .background(
+                when {
+                    selected -> Coral.copy(alpha = .18f)
+                    loadAlpha > 0f -> Coral.copy(alpha = loadAlpha)
+                    else -> Color.Transparent
+                }
+            )
+            .clickable { onSelect(date) }.padding(horizontal = 4.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(date.dayOfMonth.toString(), color = if (today) Coral else Ink, fontWeight = if (today || selected) FontWeight.Bold else FontWeight.Normal)
+        Spacer(Modifier.height(1.dp))
+        if (allItems > 0) {
+            Text("$completedItems/$allItems", color = if (completedItems == allItems) Leaf else Ink, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+            if (subtaskTotal > 0) Text("↳ $subtaskDone/$subtaskTotal", color = MutedInk, fontSize = 8.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                if (tasks.isNotEmpty()) Text("●", color = Coral, fontSize = 8.sp)
+                if (habits.isNotEmpty()) Text("●", color = Leaf, fontSize = 8.sp)
             }
         }
     }
 }
 
 @Composable
-private fun MonthCell(date: LocalDate, selected: Boolean, today: Boolean, taskCount: Int, habitCount: Int, modifier: Modifier, onSelect: (LocalDate) -> Unit) {
-    val taskDot = Coral
-    val habitDot = Leaf
-    Column(
-        modifier.height(76.dp).padding(2.dp).clip(RoundedCornerShape(12.dp))
-            .background(if (selected) Coral.copy(alpha = .15f) else Color.Transparent)
-            .clickable { onSelect(date) }.padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(date.dayOfMonth.toString(), color = if (today) Coral else Ink, fontWeight = if (today || selected) FontWeight.Bold else FontWeight.Normal)
-        Spacer(Modifier.height(7.dp))
-        Canvas(Modifier.fillMaxWidth().height(10.dp)) {
-            val total = (taskCount + habitCount).coerceAtMost(3)
-            repeat(total) { index ->
-                drawCircle(if (index < taskCount) taskDot else habitDot, radius = 3.dp.toPx(), center = Offset(size.width / 2 + (index - (total - 1) / 2f) * 10.dp.toPx(), center.y))
+private fun MonthDaySummary(date: LocalDate, tasks: List<Task>, habits: List<Habit>, onOpenDay: () -> Unit) {
+    val dayTasks = TaskSchedule.onDate(tasks, date)
+    val dayHabits = habits.filter { HabitProgress.isScheduled(it, date) }
+    val completedTasks = dayTasks.count { it.completed }
+    val completedHabits = dayHabits.count { HabitProgress.isComplete(it, date) }
+    val subtaskTotal = dayTasks.sumOf { it.subtasks.size }
+    val subtaskDone = dayTasks.sumOf { task -> task.subtasks.count { it.completed } }
+    val minutes = dayTasks.filterNot { it.completed }.sumOf { it.durationMinutes.coerceAtLeast(0) }
+
+    Surface(color = PaperRaised, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(date.format(DateTimeFormatter.ofPattern("EEEE d", EsLocale)).replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(if (minutes > 0) "${minutes / 60}h ${minutes % 60}m pendientes" else "Sin carga pendiente", color = MutedInk, fontSize = 12.sp)
+                }
+                TextButton(onClick = onOpenDay) { Text("Abrir agenda →", color = Coral, fontWeight = FontWeight.Bold) }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MonthSummaryMetric("$completedTasks/${dayTasks.size}", "tareas", Modifier.weight(1f))
+                MonthSummaryMetric("$completedHabits/${dayHabits.size}", "hábitos", Modifier.weight(1f))
+                MonthSummaryMetric(if (subtaskTotal == 0) "—" else "$subtaskDone/$subtaskTotal", "subtareas", Modifier.weight(1f))
+            }
+            val previews = dayTasks.filterNot { it.completed }.take(2)
+            previews.forEach { task ->
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("—", color = Coral, fontWeight = FontWeight.Bold)
+                    Text(task.title, modifier = Modifier.padding(start = 8.dp).weight(1f), maxLines = 1, fontSize = 12.sp)
+                    if (task.subtasks.isNotEmpty()) Text("${task.subtasks.count { it.completed }}/${task.subtasks.size}", color = MutedInk, fontSize = 10.sp)
+                }
+            }
+            if (dayTasks.isEmpty() && dayHabits.isEmpty()) {
+                Text("Día libre. Tócalo para planificar con calma.", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun MonthSummaryMetric(value: String, label: String, modifier: Modifier) {
+    Column(modifier.background(Ink.copy(alpha = .045f), RoundedCornerShape(10.dp)).padding(vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Text(label, color = MutedInk, fontSize = 9.sp)
     }
 }
 

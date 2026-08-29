@@ -34,6 +34,15 @@ class TrazoSmokeTest {
     }
 
     @Test
+    fun monthShowsLoadMapAndSelectedDaySummary() {
+        rule.onNodeWithText("Día · semana · mes").performClick()
+        rule.onNodeWithText("Mes").performClick()
+        rule.onNodeWithText("CARGA DEL MES").assertIsDisplayed()
+        rule.onNodeWithText("Abrir agenda →").assertIsDisplayed()
+        rule.onNodeWithText("subtareas").assertIsDisplayed()
+    }
+
+    @Test
     fun subtaskDependenciesAreEditableFromToday() {
         rule.onNodeWithText("Dependencias").performClick()
         rule.onNodeWithText("Nueva tarea").assertIsDisplayed()

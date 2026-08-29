@@ -11,7 +11,7 @@ Trazo es una aplicación Android offline para gestionar tareas y hábitos sin cu
 
 <p align="center">
   <img src="artifacts/Trazo-visible-today.png" width="29%" alt="Centro de herramientas visible en Hoy" />
-  <img src="artifacts/Trazo-calendar-redesign.png" width="29%" alt="Planificador semanal con cuadrícula horaria" />
+  <img src="artifacts/Trazo-month-load-map.png" width="29%" alt="Calendario mensual con mapa de carga y resumen del día" />
   <img src="artifacts/Trazo-3.3.0-today.png" width="29%" alt="Pantalla Hoy de Trazo" />
 </p>
 
@@ -35,7 +35,7 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 - Persistencia local privada en JSON versionado mediante `SharedPreferences`.
 - Estados vacíos accionables, navegación clara y controles accesibles.
 - Fechas opcionales y reprogramables para cada tarea.
-- Calendario con agenda diaria, planner semanal y vista mensual.
+- Calendario con agenda diaria, planner semanal y mapa mensual de carga con progreso de tareas, hábitos y subtareas.
 - Agenda horaria diaria con bloques calculados por duración y reprogramación rápida.
 - Arrastrar bloques del planner entre horas y días con precisión de 15 minutos.
 - Pomodoro 25/5 o 50/10 asociado a una tarea pendiente.

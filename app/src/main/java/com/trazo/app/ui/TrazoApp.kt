@@ -221,7 +221,7 @@ fun TrazoApp(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = { SketchNavigation(section) { section = it } },
             floatingActionButton = {
-                if (section != Section.FOCUS && section != Section.TODAY) {
+                if (section != Section.FOCUS && section != Section.TODAY && section != Section.CALENDAR) {
                 FloatingActionButton(
                     onClick = {
                         taskComposerDate = if (section == Section.CALENDAR) LocalDate.now() else null

@@ -7,6 +7,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -40,7 +41,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +67,7 @@ import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private enum class CalendarMode(val label: String) { DAY("Agenda diaria"), PLANNER("Semana"), MONTH("Mes") }
 private val EsLocale = Locale.forLanguageTag("es-CL")
@@ -102,6 +106,7 @@ internal fun CalendarScreen(
         )
         ModeSelector(mode) { mode = it }
         CalendarGuide(mode)
+        if (mode == CalendarMode.PLANNER) CalendarContextAdd(selectedDate, onAddTask)
         if (mode != CalendarMode.MONTH) {
             PlanningSummary(selectedDate, tasks)
             UnscheduledTray(tasks.filter { !it.completed && it.dueDate == null }, selectedDate, onTaskReschedule, onEditTask)
@@ -136,9 +141,24 @@ internal fun CalendarScreen(
                 CalendarMode.MONTH -> MonthGrid(
                     visibleMonth, selectedDate, tasks, habits, padding,
                     onSelect = { selectedDate = it },
-                    onOpenDay = { mode = CalendarMode.DAY }
+                    onOpenDay = { mode = CalendarMode.DAY },
+                    onAddTask = { onAddTask(selectedDate) }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CalendarContextAdd(date: LocalDate, onAddTask: (LocalDate) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(date.format(DateTimeFormatter.ofPattern("EEE d MMM", EsLocale)).replaceFirstChar { it.uppercase() }, color = MutedInk, fontSize = 11.sp)
+        Spacer(Modifier.weight(1f))
+        Surface(onClick = { onAddTask(date) }, color = Coral.copy(alpha = .12f), shape = RoundedCornerShape(12.dp)) {
+            Text("＋ Nueva tarea", color = Coral, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp))
         }
     }
 }
@@ -271,6 +291,7 @@ private fun DayAgenda(
         .sortedWith(compareBy<Task> { it.reminderHour }.thenBy { it.reminderMinute })
     val untimedTasks = dayTasks.filter { it !in timedTasks }
     val dayHabits = habits.filter { HabitProgress.isBaseScheduled(it, date) }
+    val conflictIds = CalendarInsights.conflictingTaskIds(tasks, date)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -289,9 +310,9 @@ private fun DayAgenda(
         }
         if (dayTasks.isEmpty()) item { CalendarEmpty("La página está libre", "Agrega algo para este día.") }
         if (timedTasks.isNotEmpty()) {
-            item { TimedAgendaHeader(timedTasks.size) }
+            item { TimedAgendaHeader(timedTasks.size, conflictIds.size) }
             items(timedTasks, key = { "timed-${it.id}" }) { task ->
-                TimedTaskBlock(task, date, onTaskToggle, onSubtaskToggle, onEditTask, onTaskReschedule)
+                TimedTaskBlock(task, date, task.id in conflictIds, onTaskToggle, onSubtaskToggle, onEditTask, onTaskReschedule)
             }
             if (untimedTasks.isNotEmpty()) item { AgendaSubLabel("Sin hora asignada") }
         }
@@ -303,7 +324,7 @@ private fun DayAgenda(
 }
 
 @Composable
-private fun TimedAgendaHeader(count: Int) {
+private fun TimedAgendaHeader(count: Int, conflictingTasks: Int) {
     Row(
         Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -311,7 +332,11 @@ private fun TimedAgendaHeader(count: Int) {
         TrazoIcon(TrazoIconKind.SCHEDULE, color = Coral, size = 18.dp)
         Text("Agenda horaria", modifier = Modifier.padding(start = 7.dp), fontWeight = FontWeight.Bold, color = Coral)
         Spacer(Modifier.weight(1f))
-        Text("$count bloque${if (count == 1) "" else "s"}", color = MutedInk, fontSize = 12.sp)
+        if (conflictingTasks > 0) {
+            Surface(color = Coral.copy(alpha = .13f), shape = RoundedCornerShape(9.dp)) {
+                Text("⚠ $conflictingTasks se cruzan", color = Coral, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+            }
+        } else Text("$count bloque${if (count == 1) "" else "s"}", color = MutedInk, fontSize = 12.sp)
     }
 }
 
@@ -325,6 +350,7 @@ private fun AgendaSubLabel(label: String) {
 private fun TimedTaskBlock(
     task: Task,
     date: LocalDate,
+    conflict: Boolean,
     onToggle: (String) -> Unit,
     onSubtaskToggle: (String, String) -> Unit,
     onEdit: (Task) -> Unit,
@@ -337,6 +363,7 @@ private fun TimedTaskBlock(
     val density = LocalDensity.current
     val dragOffset = remember(task.id, date, hour, minute) { mutableStateOf(Offset.Zero) }
     var dragging by remember(task.id) { mutableStateOf(false) }
+    var expanded by rememberSaveable(task.id) { mutableStateOf(false) }
     val pixelsPerMinute = with(density) { 1.2.dp.toPx() }
     // A short horizontal gesture is enough to cross one day; the previous
     // card-width threshold made this practically unreachable on phones.
@@ -389,13 +416,15 @@ private fun TimedTaskBlock(
             Surface(
                 color = if (dragging) Mustard.copy(alpha = .26f) else PaperRaised,
                 shape = RoundedCornerShape(13.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(min = maxOf(plannerBlockHeightDp(task.durationMinutes), 156).dp)
+                modifier = Modifier.fillMaxWidth()
+                    .then(if (conflict) Modifier.border(1.5.dp, Coral.copy(alpha = .72f), RoundedCornerShape(13.dp)) else Modifier)
+                    .heightIn(min = if (expanded) 150.dp else 100.dp)
             ) {
                 Column(Modifier.padding(10.dp)) {
-                    Row(Modifier.clickable { onEdit(task) }, verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(task.completed, { onToggle(task.id) }, colors = CheckboxDefaults.colors(checkedColor = Leaf))
-                        Column(Modifier.weight(1f)) {
-                            Text(task.title, fontWeight = FontWeight.SemiBold)
+                        Column(Modifier.weight(1f).clickable { onEdit(task) }) {
+                            Text(task.title, fontWeight = FontWeight.SemiBold, maxLines = 2)
                             Text(
                                 if (dragging) {
                                     val dayLabel = drop.date.format(DateTimeFormatter.ofPattern("EEE d", EsLocale))
@@ -406,19 +435,29 @@ private fun TimedTaskBlock(
                                 fontWeight = if (dragging) FontWeight.Bold else FontWeight.Normal
                             )
                         }
+                        TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp)) {
+                            Text(if (expanded) "Menos" else "Más", color = Coral, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
-                    TimedTaskProgress(task, onSubtaskToggle)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = {
-                            val earlier = start.minusMinutes(15)
-                            onReschedule(task.id, date, earlier.hour, earlier.minute)
-                        }) { Text("−15 min", color = MutedInk, fontSize = 11.sp) }
-                        TextButton(onClick = {
-                            val later = start.plusMinutes(15)
-                            onReschedule(task.id, date, later.hour, later.minute)
-                        }) { Text("+15 min", color = Coral, fontSize = 11.sp) }
-                        TextButton(onClick = { onReschedule(task.id, date.plusDays(1), hour, minute) }) {
-                            Text("Mañana", color = Leaf, fontSize = 11.sp)
+                    if (conflict) Text("⚠ Conflicto de horario", color = Coral, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 48.dp, top = 2.dp))
+                    if (task.subtasks.isNotEmpty() && !expanded) {
+                        val done = task.subtasks.count { it.completed }
+                        Text("↳ $done/${task.subtasks.size} pasos", color = MutedInk, fontSize = 10.sp, modifier = Modifier.padding(start = 48.dp, top = 3.dp))
+                    }
+                    if (expanded) {
+                        TimedTaskProgress(task, onSubtaskToggle)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = {
+                                val earlier = start.minusMinutes(15)
+                                onReschedule(task.id, date, earlier.hour, earlier.minute)
+                            }) { Text("−15", color = MutedInk, fontSize = 11.sp) }
+                            TextButton(onClick = {
+                                val later = start.plusMinutes(15)
+                                onReschedule(task.id, date, later.hour, later.minute)
+                            }) { Text("+15", color = Coral, fontSize = 11.sp) }
+                            TextButton(onClick = { onReschedule(task.id, date.plusDays(1), hour, minute) }) {
+                                Text("Mañana", color = Leaf, fontSize = 11.sp)
+                            }
                         }
                     }
                 }
@@ -529,27 +568,53 @@ private fun WeekPlanner(
     val dates = (0L..6L).map(monday::plusDays)
     val hours = 6..22
     val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val dayWidth = 124
     val dayScroll = rememberScrollState(
-        initial = with(density) { ((anchor.dayOfWeek.value - 1).coerceAtLeast(0) * 148).dp.roundToPx() }
+        initial = with(density) { ((anchor.dayOfWeek.value - 1).coerceAtLeast(0) * dayWidth).dp.roundToPx() }
     )
     val contextualHour = if (LocalDate.now() in dates) (LocalTime.now().hour - 1).coerceIn(6, 20) else 8
     val timeScroll = rememberScrollState(
         initial = with(density) { ((contextualHour - 6) * 76).dp.roundToPx() }
     )
-    Column(
-        Modifier.fillMaxSize().verticalScroll(timeScroll)
-            .padding(bottom = padding.calculateBottomPadding() + 96.dp)
-    ) {
+    val firstConflict = dates.firstNotNullOfOrNull { date ->
+        CalendarInsights.firstConflictStart(tasks, date)?.let { date to it }
+    }
+    Column(Modifier.fillMaxSize()) {
         Text("Desliza horizontalmente para recorrer la semana. Toca un bloque para editarlo.", color = MutedInk, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp))
-        Row(Modifier.horizontalScroll(dayScroll).padding(horizontal = 12.dp)) {
-            Column(Modifier.width(48.dp)) {
-                Spacer(Modifier.height(58.dp))
-                hours.forEach { hour ->
-                    Text("%02d".format(hour), color = MutedInk, fontSize = 10.sp, modifier = Modifier.height(76.dp).padding(top = 5.dp))
+        if (firstConflict != null) {
+            val (conflictDate, conflictMinute) = firstConflict
+            Surface(
+                onClick = {
+                    scope.launch {
+                        dayScroll.animateScrollTo(with(density) { (dates.indexOf(conflictDate) * dayWidth).dp.roundToPx() })
+                        timeScroll.animateScrollTo(with(density) { (((conflictMinute / 60) - 6).coerceAtLeast(0) * 76).dp.roundToPx() })
+                    }
+                },
+                color = Coral.copy(alpha = .13f), shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 3.dp).fillMaxWidth()
+            ) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠ Primer conflicto", color = Coral, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("${conflictDate.format(DateTimeFormatter.ofPattern("EEE d", EsLocale))} · %02d:%02d  Ver →".format(conflictMinute / 60, conflictMinute % 60), color = Coral, fontSize = 10.sp)
                 }
             }
-            dates.forEach { date ->
-                WeekDayColumn(date, tasks, habits, hours, onTaskToggle, onEditTask, onSelectDay)
+        }
+        Column(
+            Modifier.weight(1f).verticalScroll(timeScroll)
+                .padding(bottom = padding.calculateBottomPadding() + 96.dp)
+        ) {
+            Row(Modifier.horizontalScroll(dayScroll).padding(horizontal = 12.dp)) {
+                Column(Modifier.width(48.dp)) {
+                    Spacer(Modifier.height(58.dp))
+                    hours.forEach { hour ->
+                        Text("%02d".format(hour), color = MutedInk, fontSize = 10.sp, modifier = Modifier.height(76.dp).padding(top = 5.dp))
+                    }
+                }
+                dates.forEach { date ->
+                    WeekDayColumn(date, tasks, habits, hours, dayWidth, onTaskToggle, onEditTask, onSelectDay)
+                }
             }
         }
     }
@@ -558,13 +623,15 @@ private fun WeekPlanner(
 @Composable
 private fun WeekDayColumn(
     date: LocalDate, tasks: List<Task>, habits: List<Habit>, hours: IntRange,
+    dayWidth: Int,
     onTaskToggle: (String) -> Unit, onEditTask: (Task) -> Unit, onSelectDay: (LocalDate) -> Unit
 ) {
     val dayTasks = TaskSchedule.onDate(tasks, date).filter { !it.completed }
     val timed = dayTasks.filter { it.reminderHour != null }
     val conflicts = CalendarInsights.conflictCount(tasks, date)
+    val conflictIds = CalendarInsights.conflictingTaskIds(tasks, date)
     val gridLine = Ink.copy(alpha = .08f)
-    Column(Modifier.width(148.dp).padding(end = 5.dp)) {
+    Column(Modifier.width(dayWidth.dp).padding(end = 5.dp)) {
         Surface(
             onClick = { onSelectDay(date) },
             color = if (date == LocalDate.now()) Coral.copy(alpha = .16f) else Ink.copy(alpha = .045f),
@@ -593,14 +660,28 @@ private fun WeekDayColumn(
                     starting.take(2).forEach { task ->
                         Surface(
                             onClick = { onEditTask(task) },
-                            color = if (starting.size > 1) Coral.copy(alpha = .17f) else Sky.copy(alpha = .18f),
+                            color = if (task.id in conflictIds) Coral.copy(alpha = .20f) else Sky.copy(alpha = .18f),
                             shape = RoundedCornerShape(7.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
                         ) {
-                            Row(Modifier.padding(horizontal = 5.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(task.completed, { onTaskToggle(task.id) }, modifier = Modifier.size(22.dp), colors = CheckboxDefaults.colors(checkedColor = Leaf))
-                                Column(Modifier.padding(start = 3.dp)) {
-                                    Text("${date.format(DateTimeFormatter.ofPattern("EEE", EsLocale))} · %02d:%02d  %s".format(hour, task.reminderMinute, task.title), fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                                    Text("${task.durationMinutes} min", color = MutedInk, fontSize = 8.sp)
+                            if (starting.size > 1) {
+                                Row(Modifier.padding(horizontal = 4.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier.size(14.dp).border(1.5.dp, MutedInk, RoundedCornerShape(3.dp))
+                                            .clickable { onTaskToggle(task.id) }
+                                    )
+                                    Text(
+                                        "%02d:%02d · %s".format(hour, task.reminderMinute, task.title),
+                                        modifier = Modifier.padding(start = 4.dp).weight(1f),
+                                        fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1
+                                    )
+                                }
+                            } else {
+                                Row(Modifier.padding(horizontal = 5.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(task.completed, { onTaskToggle(task.id) }, modifier = Modifier.size(22.dp), colors = CheckboxDefaults.colors(checkedColor = Leaf))
+                                    Column(Modifier.padding(start = 3.dp)) {
+                                        Text("%02d:%02d · %s".format(hour, task.reminderMinute, task.title), fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                                        Text("${task.durationMinutes} min", color = MutedInk, fontSize = 8.sp)
+                                    }
                                 }
                             }
                         }
@@ -615,7 +696,8 @@ private fun WeekDayColumn(
 @Composable
 private fun MonthGrid(
     month: YearMonth, selected: LocalDate, tasks: List<Task>, habits: List<Habit>,
-    padding: PaddingValues, onSelect: (LocalDate) -> Unit, onOpenDay: () -> Unit
+    padding: PaddingValues, onSelect: (LocalDate) -> Unit, onOpenDay: () -> Unit,
+    onAddTask: () -> Unit
 ) {
     val first = month.atDay(1)
     val leading = first.dayOfWeek.value - 1
@@ -652,7 +734,7 @@ private fun MonthGrid(
         }
         item {
             Spacer(Modifier.height(12.dp))
-            MonthDaySummary(selected, tasks, habits, onOpenDay)
+            MonthDaySummary(selected, tasks, habits, onOpenDay, onAddTask)
         }
     }
 }
@@ -664,7 +746,7 @@ private fun MonthLegend() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("CARGA DEL MES", color = MutedInk, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+        Text("CARGA POR TIEMPO", color = MutedInk, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
         Spacer(Modifier.weight(1f))
         Text("● Tareas", color = Coral, fontSize = 10.sp)
         Text("● Hábitos", color = Leaf, fontSize = 10.sp)
@@ -681,45 +763,42 @@ private fun MonthCell(
     modifier: Modifier,
     onSelect: (LocalDate) -> Unit
 ) {
-    val totalItems = tasks.count { !it.completed } + habits.count { !HabitProgress.isComplete(it, date) }
+    val workloadMinutes = CalendarInsights.workloadMinutes(tasks, date)
     val loadAlpha = when {
-        totalItems >= 6 -> .22f
-        totalItems >= 4 -> .15f
-        totalItems >= 2 -> .09f
-        totalItems == 1 -> .045f
+        workloadMinutes >= 240 -> .24f
+        workloadMinutes >= 120 -> .17f
+        workloadMinutes >= 45 -> .10f
+        workloadMinutes > 0 -> .05f
         else -> 0f
     }
     val subtaskTotal = tasks.sumOf { it.subtasks.size }
     val subtaskDone = tasks.sumOf { task -> task.subtasks.count { it.completed } }
-    val completedItems = tasks.count { it.completed } + habits.count { HabitProgress.isComplete(it, date) }
-    val allItems = tasks.size + habits.size
+    val completedTasks = tasks.count { it.completed }
+    val completedHabits = habits.count { HabitProgress.isComplete(it, date) }
     Column(
         modifier.height(56.dp).padding(2.dp).clip(RoundedCornerShape(11.dp))
-            .background(
-                when {
-                    selected -> Coral.copy(alpha = .18f)
-                    loadAlpha > 0f -> Coral.copy(alpha = loadAlpha)
-                    else -> Color.Transparent
-                }
-            )
+            .background(if (loadAlpha > 0f) Coral.copy(alpha = loadAlpha) else Color.Transparent)
+            .then(if (selected) Modifier.border(2.dp, Coral, RoundedCornerShape(11.dp)) else Modifier)
             .clickable { onSelect(date) }.padding(horizontal = 4.dp, vertical = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(date.dayOfMonth.toString(), color = if (today) Coral else Ink, fontWeight = if (today || selected) FontWeight.Bold else FontWeight.Normal)
         Spacer(Modifier.height(1.dp))
-        if (allItems > 0) {
-            Text("$completedItems/$allItems", color = if (completedItems == allItems) Leaf else Ink, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-            if (subtaskTotal > 0) Text("↳ $subtaskDone/$subtaskTotal", color = MutedInk, fontSize = 8.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                if (tasks.isNotEmpty()) Text("●", color = Coral, fontSize = 8.sp)
-                if (habits.isNotEmpty()) Text("●", color = Leaf, fontSize = 8.sp)
+        if (tasks.isNotEmpty() || habits.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (tasks.isNotEmpty()) Text("$completedTasks/${tasks.size}", color = if (completedTasks == tasks.size) Leaf else Ink, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                if (habits.isNotEmpty()) Text("●$completedHabits/${habits.size}", color = Leaf, fontSize = 7.sp, fontWeight = FontWeight.SemiBold)
             }
+            if (subtaskTotal > 0) Text("↳ $subtaskDone/$subtaskTotal", color = MutedInk, fontSize = 8.sp)
         }
     }
 }
 
 @Composable
-private fun MonthDaySummary(date: LocalDate, tasks: List<Task>, habits: List<Habit>, onOpenDay: () -> Unit) {
+private fun MonthDaySummary(
+    date: LocalDate, tasks: List<Task>, habits: List<Habit>,
+    onOpenDay: () -> Unit, onAddTask: () -> Unit
+) {
     val dayTasks = TaskSchedule.onDate(tasks, date)
     val dayHabits = habits.filter { HabitProgress.isScheduled(it, date) }
     val completedTasks = dayTasks.count { it.completed }
@@ -735,7 +814,8 @@ private fun MonthDaySummary(date: LocalDate, tasks: List<Task>, habits: List<Hab
                     Text(date.format(DateTimeFormatter.ofPattern("EEEE d", EsLocale)).replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text(if (minutes > 0) "${minutes / 60}h ${minutes % 60}m pendientes" else "Sin carga pendiente", color = MutedInk, fontSize = 12.sp)
                 }
-                TextButton(onClick = onOpenDay) { Text("Abrir agenda →", color = Coral, fontWeight = FontWeight.Bold) }
+                TextButton(onClick = onAddTask, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("＋ Tarea", color = Leaf, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                TextButton(onClick = onOpenDay, contentPadding = PaddingValues(horizontal = 7.dp)) { Text("Abrir →", color = Coral, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -743,7 +823,7 @@ private fun MonthDaySummary(date: LocalDate, tasks: List<Task>, habits: List<Hab
                 MonthSummaryMetric("$completedHabits/${dayHabits.size}", "hábitos", Modifier.weight(1f))
                 MonthSummaryMetric(if (subtaskTotal == 0) "—" else "$subtaskDone/$subtaskTotal", "subtareas", Modifier.weight(1f))
             }
-            val previews = dayTasks.filterNot { it.completed }.take(2)
+            val previews = dayTasks.filterNot { it.completed }.take(1)
             previews.forEach { task ->
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {

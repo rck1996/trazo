@@ -37,8 +37,8 @@ class TrazoSmokeTest {
     fun monthShowsLoadMapAndSelectedDaySummary() {
         rule.onNodeWithText("Día · semana · mes").performClick()
         rule.onNodeWithText("Mes").performClick()
-        rule.onNodeWithText("CARGA DEL MES").assertIsDisplayed()
-        rule.onNodeWithText("Abrir agenda →").assertIsDisplayed()
+        rule.onNodeWithText("CARGA POR TIEMPO").assertIsDisplayed()
+        rule.onNodeWithText("Abrir →").assertIsDisplayed()
         rule.onNodeWithText("subtareas").assertIsDisplayed()
     }
 

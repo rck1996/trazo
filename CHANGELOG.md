@@ -1,5 +1,16 @@
 # Cambios
 
+## 3.8.0
+
+- Calendario sin botón flotante superpuesto: la creación de tareas ahora aparece dentro del contexto del día.
+- Mes calcula la intensidad por minutos de trabajo pendiente; los hábitos se muestran como señal independiente.
+- Día seleccionado con borde inequívoco, progreso separado de tareas/hábitos y resumen compacto accionable.
+- Semana muestra tres días con mayor claridad y añade «Primer conflicto» para saltar directamente al horario afectado.
+- Bloques semanales simultáneos usan filas compactas para evitar recortes.
+- Agenda diaria compacta acciones secundarias bajo «Más» y marca cada tarea involucrada en un conflicto.
+- Nuevas pruebas unitarias para carga mensual, primer conflicto e identificación de tareas superpuestas.
+- Escenario de QA con mes cargado, subtareas, hábitos y horarios solapados, exclusivo de depuración.
+
 ## 3.7.1
 
 - Mes convertido en mapa de carga con intensidad visual según el trabajo pendiente de cada día.

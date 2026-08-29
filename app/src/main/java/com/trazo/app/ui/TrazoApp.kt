@@ -133,6 +133,12 @@ import com.trazo.app.notifications.ReminderPreferences
 import com.trazo.app.notifications.ReminderSettings
 import com.trazo.app.notifications.ReminderStatus
 import com.trazo.app.data.AppSettings
+import com.trazo.app.data.TaskDateFilter
+import com.trazo.app.data.TaskFilterSelection
+import com.trazo.app.data.TaskFiltering
+import com.trazo.app.data.TaskPriorityFilter
+import com.trazo.app.data.TaskStatusFilter
+import com.trazo.app.data.TaskProgressInsights
 import com.trazo.app.data.ReviewInsights
 import com.trazo.app.data.ReviewSummary
 import com.trazo.app.data.SmartCaptureParser
@@ -152,8 +158,6 @@ private enum class Section(val label: String, val icon: TrazoIconKind) {
 }
 
 private enum class Composer { TASK, HABIT }
-private enum class TaskFilter(val label: String) { OPEN("Pendientes"), TODAY("Hoy"), DONE("Hechas"), ALL("Todas") }
-
 @Composable
 fun TrazoApp(
     viewModel: TrazoViewModel,
@@ -267,6 +271,7 @@ fun TrazoApp(
                         { id, date -> viewModel.toggleHabit(id, date) },
                         { id, date -> viewModel.toggleHabitException(id, date) },
                         toggleSubtaskWithFeedback,
+                        viewModel::rescheduleTask,
                         { date -> taskComposerDate = date; composer = Composer.TASK }
                     )
                     Section.FOCUS -> FocusScreen(activeTasks, padding, toggleTaskWithFeedback)
@@ -664,6 +669,7 @@ private fun SettingsSheet(
     val activeHabits = state.habits.filter { !it.archived && it.deletedAt == null }
     val habitChecks = activeHabits.sumOf { habit -> (0L..6L).count { offset -> HabitProgress.isComplete(habit, today.minusDays(offset)) } }
     val habitDue = activeHabits.sumOf { habit -> (0L..6L).count { offset -> HabitProgress.isScheduled(habit, today.minusDays(offset)) } }
+    val taskProgress = TaskProgressInsights.from(state.tasks, today)
     val archivedTasks = state.tasks.filter { it.archived && it.deletedAt == null }
     val archivedHabits = state.habits.filter { it.archived && it.deletedAt == null }
     val deletedTasks = state.tasks.filter { it.deletedAt != null }
@@ -714,6 +720,17 @@ private fun SettingsSheet(
                     StatCell(if (habitDue == 0) "—" else "${habitChecks * 100 / habitDue}%", "hábitos")
                     StatCell(stats.sessions.toString(), "enfoques")
                     StatCell(stats.minutes.toString(), "minutos")
+                }
+            }
+            Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 3.dp).fillMaxWidth()) {
+                Row(Modifier.padding(15.dp), horizontalArrangement = Arrangement.SpaceAround) {
+                    StatCell(taskProgress.openTasks.toString(), "pendientes")
+                    StatCell(taskProgress.scheduledThisWeek.toString(), "esta semana")
+                    StatCell(taskProgress.overdueTasks.toString(), "atrasadas")
+                    StatCell(
+                        if (taskProgress.totalSubtasks == 0) "—" else "${taskProgress.checklistPercent}%",
+                        "checklist"
+                    )
                 }
             }
             Text("ARCHIVADAS · ${archivedTasks.size + archivedHabits.size}", color = Sky, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
@@ -1123,22 +1140,14 @@ private fun TasksScreen(
     onDelete: (String) -> Unit, onDateChange: (String, LocalDate?) -> Unit,
     onEdit: (Task) -> Unit, onArchive: (String) -> Unit
 ) {
-    var filter by remember { mutableStateOf(TaskFilter.OPEN) }
+    var filters by remember { mutableStateOf(TaskFilterSelection()) }
     var query by remember { mutableStateOf("") }
     val today = LocalDate.now()
-    val visible = tasks.filter {
-        (query.isBlank() || it.title.contains(query, true) || it.note.contains(query, true) || it.tags.any { tag -> tag.contains(query, true) }) &&
-        when (filter) {
-            TaskFilter.OPEN -> !it.completed
-            TaskFilter.TODAY -> !it.completed && (it.dueDate == null || !it.dueDate.isAfter(today))
-            TaskFilter.DONE -> it.completed
-            TaskFilter.ALL -> true
-        }
-    }.sortedWith(compareBy<Task> { it.completed }.thenBy { it.dueDate ?: LocalDate.MAX }.thenByDescending { it.priority })
+    val visible = TaskFiltering.apply(tasks, query, filters, today)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
         item { PageHeader("Lista flexible", "Tus tareas", "Ordena sin perder la calma.") }
         item { SearchField(query, { query = it }, "Buscar tareas o #etiquetas") }
-        item { TaskFilters(filter) { filter = it } }
+        item { TaskFilters(filters) { filters = it } }
         if (visible.isEmpty()) item {
             EmptyNote(
                 if (tasks.isEmpty()) "La hoja está limpia" else "Nada por aquí",
@@ -1156,25 +1165,59 @@ private fun TasksScreen(
 }
 
 @Composable
-private fun TaskFilters(selected: TaskFilter, onSelect: (TaskFilter) -> Unit) {
+private fun TaskFilters(selected: TaskFilterSelection, onSelect: (TaskFilterSelection) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
+        FilterRow(
+            options = TaskStatusFilter.entries.toList(),
+            selected = selected.status,
+            onSelect = { onSelect(selected.copy(status = it)) }
+        )
+        FilterRow(
+            options = TaskDateFilter.entries.toList(),
+            selected = selected.date,
+            onSelect = { onSelect(selected.copy(date = it)) }
+        )
+        FilterRow(
+            options = TaskPriorityFilter.entries.toList(),
+            selected = selected.priority,
+            onSelect = { onSelect(selected.copy(priority = it)) }
+        )
+    }
+}
+
+private interface LabeledFilter { val label: String }
+private val TaskStatusFilter.filterLabel get() = label
+private val TaskDateFilter.filterLabel get() = label
+private val TaskPriorityFilter.filterLabel get() = label
+
+@Composable
+private fun <T> FilterRow(options: List<T>, selected: T, onSelect: (T) -> Unit) where T : Enum<T> {
+    val labels = options.associateWith {
+        when (it) {
+            is TaskStatusFilter -> it.filterLabel
+            is TaskDateFilter -> it.filterLabel
+            is TaskPriorityFilter -> it.filterLabel
+            else -> it.name
+        }
+    }
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        TaskFilter.entries.forEach { filter ->
+        options.forEach { option ->
+            val isSelected = option == selected
             Surface(
-                onClick = { onSelect(filter) },
-                color = if (filter == selected) Ink else Color.Transparent,
+                onClick = { onSelect(option) },
+                color = if (isSelected) Ink else PaperRaised,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.sketchBorder(Ink.copy(alpha = if (isSelected) .14f else .08f))
             ) {
                 Text(
-                    filter.label,
-                    color = if (filter == selected) Paper else MutedInk,
+                    labels.getValue(option),
+                    color = if (isSelected) Paper else MutedInk,
                     fontSize = 12.sp,
-                    fontWeight = if (filter == selected) FontWeight.Bold else FontWeight.Medium,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 9.dp)
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                 )
             }
         }

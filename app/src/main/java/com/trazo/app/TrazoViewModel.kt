@@ -133,6 +133,17 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
         })
     }
 
+    /** Moves a planned task without opening the editor. Used by the Day agenda controls. */
+    fun rescheduleTask(id: String, dueDate: LocalDate, hour: Int, minute: Int) = update { state ->
+        state.copy(tasks = state.tasks.map {
+            if (it.id == id) it.copy(
+                dueDate = dueDate,
+                reminderHour = hour.coerceIn(0, 23),
+                reminderMinute = minute.coerceIn(0, 59)
+            ) else it
+        })
+    }
+
     fun updateTask(id: String, input: TaskInput) {
         if (input.title.isBlank()) return
         update { state -> state.copy(tasks = state.tasks.map {

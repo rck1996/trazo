@@ -79,7 +79,10 @@ class TaskListWidget : AppWidgetProvider() {
                     setViewVisibility(rowId, if (task == null) View.GONE else View.VISIBLE)
                     if (task != null) {
                         val prefix = if (task.priority == TaskPriority.IMPORTANT) "★  " else "○  "
-                        setTextViewText(titleId, prefix + task.title)
+                        val steps = task.subtasks.takeIf { it.isNotEmpty() }?.let {
+                            "  ${it.count { step -> step.completed }}/${it.size}"
+                        }.orEmpty()
+                        setTextViewText(titleId, prefix + task.title + steps)
                         setContentDescription(checkId, "Completar ${task.title}")
                         val complete = Intent(context, TaskListWidget::class.java)
                             .setAction(ACTION_COMPLETE)

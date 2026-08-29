@@ -34,6 +34,7 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 - Estados vacíos accionables, navegación clara y controles accesibles.
 - Fechas opcionales y reprogramables para cada tarea.
 - Calendario con agenda diaria, planner semanal y vista mensual.
+- Agenda horaria diaria con bloques calculados por duración y reprogramación rápida.
 - Pomodoro 25/5 o 50/10 asociado a una tarea pendiente.
 - Centro de avisos con diagnóstico de permisos, próximo/último envío y prueba audible del modo elegido.
 - Agenda matinal y cierre del día independientes, con cualquier hora en formato `HH:MM`.
@@ -44,6 +45,7 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 - Widget de inicio con agenda del día, pilas deslizables de tareas y hábitos, acciones rápidas y accesos a Planner/Enfoque.
 - Inicio reconstruido como un estudio diario: progreso circular animado, acciones rápidas y mensajes adaptativos.
 - Filtros de tareas, historial visual de siete días y resumen de rachas para hábitos.
+- Filtros combinables por estado, fecha y prioridad, más avance global de checklists.
 - Transiciones direccionales entre secciones, cambio animado del calendario y respiración orgánica del Pomodoro.
 - Seis widgets independientes e interactivos: resumen del día, hábito rápido, temporizador, tres próximas tareas, jardín de rituales y captura inteligente por voz.
 - Modo Pomodoro de pantalla siempre activa, con brillo tenue, reloj OLED y dibujo animado adaptado a enfoque o descanso.

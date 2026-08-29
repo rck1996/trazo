@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -50,6 +51,7 @@ import com.trazo.app.model.Task
 import com.trazo.app.model.TaskSchedule
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -63,6 +65,7 @@ internal fun CalendarScreen(
     onTaskToggle: (String) -> Unit, onHabitToggle: (String, LocalDate) -> Unit,
     onHabitExceptionToggle: (String, LocalDate) -> Unit,
     onSubtaskToggle: (String, String) -> Unit,
+    onTaskReschedule: (String, LocalDate, Int, Int) -> Unit,
     onAddTask: (LocalDate) -> Unit
 ) {
     var mode by remember { mutableStateOf(CalendarMode.PLANNER) }
@@ -97,7 +100,7 @@ internal fun CalendarScreen(
             label = "calendar mode"
         ) { currentMode ->
             when (currentMode) {
-                CalendarMode.DAY -> DayAgenda(selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle, onHabitExceptionToggle, onSubtaskToggle, onAddTask)
+                CalendarMode.DAY -> DayAgenda(selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle, onHabitExceptionToggle, onSubtaskToggle, onTaskReschedule, onAddTask)
                 CalendarMode.PLANNER -> WeekPlanner(selectedDate, tasks, habits, padding, onTaskToggle) {
                     selectedDate = it
                     visibleMonth = YearMonth.from(it)
@@ -161,9 +164,13 @@ private fun DayAgenda(
     onTaskToggle: (String) -> Unit, onHabitToggle: (String, LocalDate) -> Unit,
     onHabitExceptionToggle: (String, LocalDate) -> Unit,
     onSubtaskToggle: (String, String) -> Unit,
+    onTaskReschedule: (String, LocalDate, Int, Int) -> Unit,
     onAddTask: (LocalDate) -> Unit
 ) {
     val dayTasks = TaskSchedule.onDate(tasks, date).sortedBy { it.completed }
+    val timedTasks = dayTasks.filter { !it.completed && it.reminderHour != null }
+        .sortedWith(compareBy<Task> { it.reminderHour }.thenBy { it.reminderMinute })
+    val untimedTasks = dayTasks.filter { it !in timedTasks }
     val dayHabits = habits.filter { HabitProgress.isBaseScheduled(it, date) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
         item {
@@ -182,10 +189,83 @@ private fun DayAgenda(
             AgendaLabel("Tareas", dayTasks.count { it.completed }, dayTasks.size)
         }
         if (dayTasks.isEmpty()) item { CalendarEmpty("La página está libre", "Agrega algo para este día.") }
-        items(dayTasks, key = { it.id }) { task -> CalendarTaskRow(task, onTaskToggle, onSubtaskToggle) }
+        if (timedTasks.isNotEmpty()) {
+            item { TimedAgendaHeader(timedTasks.size) }
+            items(timedTasks, key = { "timed-${it.id}" }) { task ->
+                TimedTaskBlock(task, date, onTaskToggle, onSubtaskToggle, onTaskReschedule)
+            }
+            if (untimedTasks.isNotEmpty()) item { AgendaSubLabel("Sin hora asignada") }
+        }
+        items(untimedTasks, key = { it.id }) { task -> CalendarTaskRow(task, onTaskToggle, onSubtaskToggle) }
         item { AgendaLabel("Hábitos", dayHabits.count { HabitProgress.isComplete(it, date) }, dayHabits.size) }
         if (dayHabits.isEmpty()) item { CalendarEmpty("Sin rituales programados", "Este día puede respirar.") }
         items(dayHabits, key = { it.id }) { habit -> CalendarHabitRow(habit, date, onHabitToggle, onHabitExceptionToggle) }
+    }
+}
+
+@Composable
+private fun TimedAgendaHeader(count: Int) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TrazoIcon(TrazoIconKind.SCHEDULE, color = Coral, size = 18.dp)
+        Text("Agenda horaria", modifier = Modifier.padding(start = 7.dp), fontWeight = FontWeight.Bold, color = Coral)
+        Spacer(Modifier.weight(1f))
+        Text("$count bloque${if (count == 1) "" else "s"}", color = MutedInk, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun AgendaSubLabel(label: String) {
+    Text(label, color = MutedInk, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 24.dp, top = 12.dp, bottom = 3.dp))
+}
+
+@Composable
+private fun TimedTaskBlock(
+    task: Task,
+    date: LocalDate,
+    onToggle: (String) -> Unit,
+    onSubtaskToggle: (String, String) -> Unit,
+    onReschedule: (String, LocalDate, Int, Int) -> Unit
+) {
+    val hour = task.reminderHour ?: return
+    val minute = task.reminderMinute
+    val start = LocalTime.of(hour, minute)
+    val end = start.plusMinutes(task.durationMinutes.toLong())
+    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 5.dp), verticalAlignment = Alignment.Top) {
+        Column(Modifier.width(58.dp).padding(top = 13.dp)) {
+            Text(start.format(DateTimeFormatter.ofPattern("HH:mm")), color = Coral, fontWeight = FontWeight.Bold)
+            Text(end.format(DateTimeFormatter.ofPattern("HH:mm")), color = MutedInk, fontSize = 11.sp)
+        }
+        Column(Modifier.weight(1f)) {
+            Surface(color = PaperRaised, shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(10.dp)) {
+                    Row(Modifier.clickable { onToggle(task.id) }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(task.completed, { onToggle(task.id) }, colors = CheckboxDefaults.colors(checkedColor = Leaf))
+                        Column(Modifier.weight(1f)) {
+                            Text(task.title, fontWeight = FontWeight.SemiBold)
+                            Text("${task.durationMinutes} min · bloque programado", color = MutedInk, fontSize = 11.sp)
+                        }
+                    }
+                    TaskChecklist(task, onSubtaskToggle, compact = true)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = {
+                            val earlier = start.minusMinutes(15)
+                            onReschedule(task.id, date, earlier.hour, earlier.minute)
+                        }) { Text("−15 min", color = MutedInk, fontSize = 11.sp) }
+                        TextButton(onClick = {
+                            val later = start.plusMinutes(15)
+                            onReschedule(task.id, date, later.hour, later.minute)
+                        }) { Text("+15 min", color = Coral, fontSize = 11.sp) }
+                        TextButton(onClick = { onReschedule(task.id, date.plusDays(1), hour, minute) }) {
+                            Text("Mañana", color = Leaf, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

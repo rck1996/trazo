@@ -1,6 +1,6 @@
 # Cambios
 
-## Próxima versión
+## 3.5.0
 
 - Subtareas persistentes, editables y marcables desde las tarjetas de tareas.
 - Progreso de subtareas en la agenda diaria y el planner semanal.

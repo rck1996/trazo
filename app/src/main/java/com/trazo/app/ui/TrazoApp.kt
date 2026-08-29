@@ -278,6 +278,7 @@ fun TrazoApp(
                         { id, date -> viewModel.toggleHabitException(id, date) },
                         toggleSubtaskWithFeedback,
                         viewModel::rescheduleTask,
+                        { task -> editingTask = task; composer = Composer.TASK },
                         { date -> taskComposerDate = date; composer = Composer.TASK }
                     )
                     Section.FOCUS -> FocusScreen(activeTasks, padding, toggleTaskWithFeedback)

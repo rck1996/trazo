@@ -1,5 +1,15 @@
 # Cambios
 
+## 3.7.0
+
+- Semana convertida en cuadrícula horaria desplazable por días y horas, reemplazando la antigua lista duplicada.
+- Resumen de carga diaria con tiempo planificado, mayor hueco libre y conflictos de horario.
+- Bandeja de tareas sin programar con acción rápida para ubicarlas en el día seleccionado.
+- Detección de superposiciones y cálculo de ventanas libres, cubiertos por pruebas unitarias.
+- Apertura directa del editor al tocar un bloque del calendario.
+- La semana abre automáticamente cerca del día y hora actuales.
+- Agenda diaria conserva arrastre, acciones rápidas, progreso y dependencias; Mes mantiene la visión de carga y abre el día elegido.
+
 ## 3.6.5
 
 - «Siguiente» en Agenda diaria ahora es una acción real para completar la próxima subtarea.

@@ -8,6 +8,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,6 +75,7 @@ internal fun CalendarScreen(
     onHabitExceptionToggle: (String, LocalDate) -> Unit,
     onSubtaskToggle: (String, String) -> Unit,
     onTaskReschedule: (String, LocalDate, Int, Int) -> Unit,
+    onEditTask: (Task) -> Unit,
     onAddTask: (LocalDate) -> Unit
 ) {
     var mode by remember { mutableStateOf(CalendarMode.PLANNER) }
@@ -98,7 +102,10 @@ internal fun CalendarScreen(
         )
         ModeSelector(mode) { mode = it }
         CalendarGuide(mode)
+        PlanningSummary(selectedDate, tasks)
+        UnscheduledTray(tasks.filter { !it.completed && it.dueDate == null }, selectedDate, onTaskReschedule, onEditTask)
         AnimatedContent(
+            modifier = Modifier.weight(1f),
             targetState = mode,
             transitionSpec = {
                 fadeIn(tween(if (reducedMotion) 0 else 260)) togetherWith
@@ -117,9 +124,9 @@ internal fun CalendarScreen(
                             visibleMonth = YearMonth.from(newDate)
                         }
                     },
-                    onAddTask
+                    onEditTask, onAddTask
                 )
-                CalendarMode.PLANNER -> WeekPlanner(selectedDate, tasks, habits, padding, onTaskToggle) {
+                CalendarMode.PLANNER -> WeekPlanner(selectedDate, tasks, habits, padding, onTaskToggle, onEditTask) {
                     selectedDate = it
                     visibleMonth = YearMonth.from(it)
                     mode = CalendarMode.DAY
@@ -127,6 +134,57 @@ internal fun CalendarScreen(
                 CalendarMode.MONTH -> MonthGrid(visibleMonth, selectedDate, tasks, habits, padding) {
                     selectedDate = it
                     mode = CalendarMode.DAY
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanningSummary(date: LocalDate, tasks: List<Task>) {
+    val minutes = CalendarInsights.plannedMinutes(tasks, date)
+    val conflicts = CalendarInsights.conflictCount(tasks, date)
+    val largestFree = CalendarInsights.freeWindows(tasks, date).maxOfOrNull { it.durationMinutes } ?: 0
+    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        PlanningMetric("${minutes / 60}h ${minutes % 60}m", "planificado", Modifier.weight(1f))
+        PlanningMetric(if (largestFree == 0) "—" else "${largestFree / 60}h ${largestFree % 60}m", "mayor hueco", Modifier.weight(1f))
+        PlanningMetric(conflicts.toString(), if (conflicts == 1) "conflicto" else "conflictos", Modifier.weight(1f), conflicts > 0)
+    }
+}
+
+@Composable
+private fun PlanningMetric(value: String, label: String, modifier: Modifier, warning: Boolean = false) {
+    Surface(color = if (warning) Coral.copy(alpha = .13f) else Ink.copy(alpha = .045f), shape = RoundedCornerShape(10.dp), modifier = modifier) {
+        Column(Modifier.padding(vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(value, color = if (warning) Coral else Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(label, color = MutedInk, fontSize = 9.sp)
+        }
+    }
+}
+
+@Composable
+private fun UnscheduledTray(
+    tasks: List<Task>, date: LocalDate,
+    onSchedule: (String, LocalDate, Int, Int) -> Unit,
+    onEdit: (Task) -> Unit
+) {
+    if (tasks.isEmpty()) return
+    val suggestedHour = if (date == LocalDate.now()) (LocalTime.now().hour + 1).coerceAtMost(20) else 9
+    Column(Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 5.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("SIN PROGRAMAR", color = Coral, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 1.sp)
+            Spacer(Modifier.weight(1f))
+            Text("${tasks.size} para ubicar", color = MutedInk, fontSize = 10.sp)
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            tasks.take(8).forEach { task ->
+                Surface(color = Mustard.copy(alpha = .16f), shape = RoundedCornerShape(11.dp)) {
+                    Row(Modifier.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(task.title, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, modifier = Modifier.clickable { onEdit(task) }.padding(vertical = 8.dp))
+                        TextButton(onClick = { onSchedule(task.id, date, suggestedHour, 0) }) {
+                            Text("Ubicar ${"%02d:00".format(suggestedHour)}", color = Coral, fontSize = 10.sp)
+                        }
+                    }
                 }
             }
         }
@@ -202,6 +260,7 @@ private fun DayAgenda(
     onHabitExceptionToggle: (String, LocalDate) -> Unit,
     onSubtaskToggle: (String, String) -> Unit,
     onTaskReschedule: (String, LocalDate, Int, Int) -> Unit,
+    onEditTask: (Task) -> Unit,
     onAddTask: (LocalDate) -> Unit
 ) {
     val dayTasks = TaskSchedule.onDate(tasks, date).sortedBy { it.completed }
@@ -229,11 +288,11 @@ private fun DayAgenda(
         if (timedTasks.isNotEmpty()) {
             item { TimedAgendaHeader(timedTasks.size) }
             items(timedTasks, key = { "timed-${it.id}" }) { task ->
-                TimedTaskBlock(task, date, onTaskToggle, onSubtaskToggle, onTaskReschedule)
+                TimedTaskBlock(task, date, onTaskToggle, onSubtaskToggle, onEditTask, onTaskReschedule)
             }
             if (untimedTasks.isNotEmpty()) item { AgendaSubLabel("Sin hora asignada") }
         }
-        items(untimedTasks, key = { it.id }) { task -> CalendarTaskRow(task, onTaskToggle, onSubtaskToggle) }
+        items(untimedTasks, key = { it.id }) { task -> CalendarTaskRow(task, onTaskToggle, onSubtaskToggle, onEditTask) }
         item { AgendaLabel("Hábitos", dayHabits.count { HabitProgress.isComplete(it, date) }, dayHabits.size) }
         if (dayHabits.isEmpty()) item { CalendarEmpty("Sin rituales programados", "Este día puede respirar.") }
         items(dayHabits, key = { it.id }) { habit -> CalendarHabitRow(habit, date, onHabitToggle, onHabitExceptionToggle) }
@@ -265,6 +324,7 @@ private fun TimedTaskBlock(
     date: LocalDate,
     onToggle: (String) -> Unit,
     onSubtaskToggle: (String, String) -> Unit,
+    onEdit: (Task) -> Unit,
     onReschedule: (String, LocalDate, Int, Int) -> Unit
 ) {
     val hour = task.reminderHour ?: return
@@ -329,7 +389,7 @@ private fun TimedTaskBlock(
                 modifier = Modifier.fillMaxWidth().heightIn(min = maxOf(plannerBlockHeightDp(task.durationMinutes), 156).dp)
             ) {
                 Column(Modifier.padding(10.dp)) {
-                    Row(Modifier.clickable { onToggle(task.id) }, verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.clickable { onEdit(task) }, verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(task.completed, { onToggle(task.id) }, colors = CheckboxDefaults.colors(checkedColor = Leaf))
                         Column(Modifier.weight(1f)) {
                             Text(task.title, fontWeight = FontWeight.SemiBold)
@@ -406,14 +466,14 @@ private fun AgendaLabel(label: String, done: Int, total: Int) {
 }
 
 @Composable
-private fun CalendarTaskRow(task: Task, onToggle: (String) -> Unit, onSubtaskToggle: (String, String) -> Unit) {
+private fun CalendarTaskRow(task: Task, onToggle: (String) -> Unit, onSubtaskToggle: (String, String) -> Unit, onEdit: (Task) -> Unit) {
     Surface(
         color = if (task.completed) Leaf.copy(alpha = .16f) else PaperRaised,
         shape = RoundedCornerShape(13.dp),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp).fillMaxWidth()
     ) {
         Column(Modifier.padding(10.dp)) {
-            Row(Modifier.clickable { onToggle(task.id) }, verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.clickable { onEdit(task) }, verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(task.completed, { onToggle(task.id) }, colors = CheckboxDefaults.colors(checkedColor = Leaf))
                 Column(Modifier.weight(1f)) {
                     Text(task.title, fontWeight = FontWeight.SemiBold, color = if (task.completed) MutedInk else Ink)
@@ -460,59 +520,92 @@ private fun CalendarHabitRow(
 @Composable
 private fun WeekPlanner(
     anchor: LocalDate, tasks: List<Task>, habits: List<Habit>, padding: PaddingValues,
-    onTaskToggle: (String) -> Unit, onSelectDay: (LocalDate) -> Unit
+    onTaskToggle: (String) -> Unit, onEditTask: (Task) -> Unit, onSelectDay: (LocalDate) -> Unit
 ) {
     val monday = anchor.minusDays((anchor.dayOfWeek.value - DayOfWeek.MONDAY.value).toLong())
     val dates = (0L..6L).map(monday::plusDays)
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
-        items(dates, key = { it.toEpochDay() }) { date ->
-            val dayTasks = TaskSchedule.onDate(tasks, date)
-            val dueHabits = habits.count { HabitProgress.isScheduled(it, date) }
-            PlannerDay(date, dayTasks, dueHabits, onTaskToggle) { onSelectDay(date) }
+    val hours = 6..22
+    val density = LocalDensity.current
+    val dayScroll = rememberScrollState(
+        initial = with(density) { ((anchor.dayOfWeek.value - 1).coerceAtLeast(0) * 148).dp.roundToPx() }
+    )
+    val contextualHour = if (LocalDate.now() in dates) (LocalTime.now().hour - 1).coerceIn(6, 20) else 8
+    val timeScroll = rememberScrollState(
+        initial = with(density) { ((contextualHour - 6) * 76).dp.roundToPx() }
+    )
+    Column(
+        Modifier.fillMaxSize().verticalScroll(timeScroll)
+            .padding(bottom = padding.calculateBottomPadding() + 96.dp)
+    ) {
+        Text("Desliza horizontalmente para recorrer la semana. Toca un bloque para editarlo.", color = MutedInk, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp))
+        Row(Modifier.horizontalScroll(dayScroll).padding(horizontal = 12.dp)) {
+            Column(Modifier.width(48.dp)) {
+                Spacer(Modifier.height(58.dp))
+                hours.forEach { hour ->
+                    Text("%02d".format(hour), color = MutedInk, fontSize = 10.sp, modifier = Modifier.height(76.dp).padding(top = 5.dp))
+                }
+            }
+            dates.forEach { date ->
+                WeekDayColumn(date, tasks, habits, hours, onTaskToggle, onEditTask, onSelectDay)
+            }
         }
     }
 }
 
 @Composable
-private fun PlannerDay(
-    date: LocalDate, tasks: List<Task>, habitCount: Int, onTaskToggle: (String) -> Unit, onOpen: () -> Unit
+private fun WeekDayColumn(
+    date: LocalDate, tasks: List<Task>, habits: List<Habit>, hours: IntRange,
+    onTaskToggle: (String) -> Unit, onEditTask: (Task) -> Unit, onSelectDay: (LocalDate) -> Unit
 ) {
-    val today = date == LocalDate.now()
-    val completeDot = Leaf
-    val pendingDot = Coral
-    Surface(
-        color = if (today) Mustard.copy(alpha = .20f) else PaperRaised,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp).fillMaxWidth().clickable(onClick = onOpen)
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(46.dp).clip(CircleShape).background(if (today) Coral else Ink.copy(alpha = .07f)), contentAlignment = Alignment.Center) {
-                    Text(date.dayOfMonth.toString(), color = if (today) Color.White else Ink, fontWeight = FontWeight.Bold)
-                }
-                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    Text(date.format(DateTimeFormatter.ofPattern("EEEE", EsLocale)).replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold)
-                    Text("${tasks.size} tareas · $habitCount hábitos", color = MutedInk, fontSize = 13.sp)
-                }
-                TrazoIcon(TrazoIconKind.ARROW_RIGHT, color = Coral, size = 20.dp)
+    val dayTasks = TaskSchedule.onDate(tasks, date).filter { !it.completed }
+    val timed = dayTasks.filter { it.reminderHour != null }
+    val conflicts = CalendarInsights.conflictCount(tasks, date)
+    val gridLine = Ink.copy(alpha = .08f)
+    Column(Modifier.width(148.dp).padding(end = 5.dp)) {
+        Surface(
+            onClick = { onSelectDay(date) },
+            color = if (date == LocalDate.now()) Coral.copy(alpha = .16f) else Ink.copy(alpha = .045f),
+            shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(54.dp)
+        ) {
+            Column(Modifier.padding(7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(date.format(DateTimeFormatter.ofPattern("EEE d", EsLocale)).replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text("${dayTasks.size} tareas · ${habits.count { HabitProgress.isScheduled(it, date) }} hábitos", color = if (conflicts > 0) Coral else MutedInk, fontSize = 8.sp)
             }
-            tasks.take(3).forEach { task ->
-                Row(Modifier.fillMaxWidth().clickable { onTaskToggle(task.id) }.padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Canvas(Modifier.size(18.dp)) { drawCircle(if (task.completed) completeDot else pendingDot, radius = 4.dp.toPx()) }
-                    Text(task.title, modifier = Modifier.padding(start = 8.dp), color = if (task.completed) MutedInk else Ink, maxLines = 1)
-                    if (task.subtasks.isNotEmpty()) {
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            "${task.subtasks.count { it.completed }}/${task.subtasks.size}",
-                            color = if (task.subtasks.all { it.completed }) Leaf else MutedInk,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+        }
+        hours.forEach { hour ->
+            val starting = timed.filter { it.reminderHour == hour }.sortedBy { it.reminderMinute }
+            Box(
+                Modifier.fillMaxWidth().height(76.dp).padding(top = 2.dp)
+                    .background(Ink.copy(alpha = .028f), RoundedCornerShape(7.dp))
+                    .clickable { onSelectDay(date) }
+            ) {
+                if (starting.isEmpty()) {
+                    Text(
+                        "${date.format(DateTimeFormatter.ofPattern("EEE d", EsLocale))} · ${"%02d:00".format(hour)}",
+                        color = MutedInk.copy(alpha = .62f), fontSize = 8.sp,
+                        modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
+                    )
+                    Canvas(Modifier.fillMaxWidth().height(1.dp).align(Alignment.TopCenter)) { drawLine(gridLine, Offset.Zero, Offset(size.width, 0f), 1f) }
+                } else Column(Modifier.padding(4.dp)) {
+                    starting.take(2).forEach { task ->
+                        Surface(
+                            onClick = { onEditTask(task) },
+                            color = if (starting.size > 1) Coral.copy(alpha = .17f) else Sky.copy(alpha = .18f),
+                            shape = RoundedCornerShape(7.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
+                        ) {
+                            Row(Modifier.padding(horizontal = 5.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(task.completed, { onTaskToggle(task.id) }, modifier = Modifier.size(22.dp), colors = CheckboxDefaults.colors(checkedColor = Leaf))
+                                Column(Modifier.padding(start = 3.dp)) {
+                                    Text("${date.format(DateTimeFormatter.ofPattern("EEE", EsLocale))} · %02d:%02d  %s".format(hour, task.reminderMinute, task.title), fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                    Text("${task.durationMinutes} min", color = MutedInk, fontSize = 8.sp)
+                                }
+                            }
+                        }
                     }
                 }
             }
-            if (tasks.size > 3) Text("+ ${tasks.size - 3} más", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(start = 26.dp, top = 4.dp))
         }
+        if (dayTasks.any { it.reminderHour == null }) Text("+ ${dayTasks.count { it.reminderHour == null }} sin hora", color = Coral, fontSize = 9.sp, modifier = Modifier.padding(5.dp).clickable { onSelectDay(date) })
     }
 }
 

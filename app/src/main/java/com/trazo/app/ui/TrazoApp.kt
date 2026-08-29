@@ -42,9 +42,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -77,6 +79,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -758,6 +761,7 @@ private fun SettingsSheet(
     onImport: () -> Unit,
     viewModel: TrazoViewModel
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var newCategoryName by remember { mutableStateOf("") }
     val state by viewModel.state
     val settings by viewModel.settings
@@ -773,9 +777,10 @@ private fun SettingsSheet(
     val archivedHabits = state.habits.filter { it.archived && it.deletedAt == null }
     val deletedTasks = state.tasks.filter { it.deletedAt != null }
     val deletedHabits = state.habits.filter { it.deletedAt != null }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper, sheetState = sheetState) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 30.dp)
+            Modifier.fillMaxWidth().fillMaxHeight(.94f).verticalScroll(rememberScrollState())
+                .navigationBarsPadding().padding(bottom = 72.dp)
         ) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
                 Text("Ajustes", style = MaterialTheme.typography.headlineMedium)
@@ -1849,6 +1854,7 @@ private fun TaskComposer(
     onDismiss: () -> Unit, onSaveTemplate: (String, TaskInput) -> Unit,
     onSave: (TaskInput) -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var title by remember(task, draft) { mutableStateOf(task?.title ?: draft?.title.orEmpty()) }
     var note by remember(task, draft) { mutableStateOf(task?.note ?: draft?.note.orEmpty()) }
     var important by remember(task, draft) { mutableStateOf(task?.priority == TaskPriority.IMPORTANT || draft?.important == true) }
@@ -1867,7 +1873,7 @@ private fun TaskComposer(
     var tags by remember(task, draft) { mutableStateOf((task?.tags ?: draft?.tags.orEmpty()).joinToString(", ")) }
     var showDatePicker by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper, sheetState = sheetState) {
         ComposerLayout(if (task == null) "Nueva tarea" else "Editar tarea", if (task == null) "Sácala de tu cabeza y déjala aquí." else "Ajusta lo que necesites.") {
             if (task == null) {
                 Text("Plantillas", color = MutedInk, fontSize = 12.sp)
@@ -2148,6 +2154,7 @@ private fun HabitComposer(
     onDismiss: () -> Unit,
     onSave: (HabitInput) -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var title by remember(habit, draft) { mutableStateOf(habit?.title ?: draft?.title.orEmpty()) }
     var emoji by remember(habit, draft) { mutableStateOf(habit?.emoji ?: draft?.emoji ?: "✦") }
     var category by remember(habit, draft) { mutableStateOf(habit?.category ?: draft?.category ?: HabitCategory.GENERAL) }
@@ -2167,7 +2174,7 @@ private fun HabitComposer(
         DayOfWeek.MONDAY to "L", DayOfWeek.TUESDAY to "M", DayOfWeek.WEDNESDAY to "X",
         DayOfWeek.THURSDAY to "J", DayOfWeek.FRIDAY to "V", DayOfWeek.SATURDAY to "S", DayOfWeek.SUNDAY to "D"
     )
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper, sheetState = sheetState) {
         ComposerLayout(if (habit == null) "Nuevo hábito" else "Editar hábito", if (habit == null) "Hazlo tan pequeño que dé gusto volver." else "Haz que siga encajando en tu vida.") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(emoji, { emoji = it.take(2) }, label = { Text("Símbolo") }, singleLine = true, modifier = Modifier.width(94.dp))
@@ -2367,7 +2374,10 @@ private fun parseReminder(value: String): Pair<Int, Int>? {
 
 @Composable
 private fun ComposerLayout(title: String, subtitle: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
+    Column(
+        Modifier.fillMaxWidth().fillMaxHeight(.94f).verticalScroll(rememberScrollState())
+            .imePadding().navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 88.dp)
+    ) {
         Text(title, style = MaterialTheme.typography.headlineMedium)
         Text(subtitle, color = MutedInk, modifier = Modifier.padding(bottom = 18.dp))
         content()

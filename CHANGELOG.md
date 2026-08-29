@@ -1,5 +1,12 @@
 # Cambios
 
+## 3.6.5
+
+- «Siguiente» en Agenda diaria ahora es una acción real para completar la próxima subtarea.
+- El control muestra «Bloqueado» cuando existe una dependencia pendiente y explica cuál es.
+- Editores y Ajustes se abren completamente expandidos para evitar conflicto entre arrastre y scroll.
+- Desplazamiento interno continuo, compatible con teclado, barra de navegación y controles finales.
+
 ## 3.6.4
 
 - El arrastre usa la posición final real al soltar, evitando movimientos que no se guardaban.

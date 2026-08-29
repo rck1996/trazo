@@ -229,7 +229,7 @@ private fun DayAgenda(
         if (timedTasks.isNotEmpty()) {
             item { TimedAgendaHeader(timedTasks.size) }
             items(timedTasks, key = { "timed-${it.id}" }) { task ->
-                TimedTaskBlock(task, date, onTaskToggle, onTaskReschedule)
+                TimedTaskBlock(task, date, onTaskToggle, onSubtaskToggle, onTaskReschedule)
             }
             if (untimedTasks.isNotEmpty()) item { AgendaSubLabel("Sin hora asignada") }
         }
@@ -264,6 +264,7 @@ private fun TimedTaskBlock(
     task: Task,
     date: LocalDate,
     onToggle: (String) -> Unit,
+    onSubtaskToggle: (String, String) -> Unit,
     onReschedule: (String, LocalDate, Int, Int) -> Unit
 ) {
     val hour = task.reminderHour ?: return
@@ -343,7 +344,7 @@ private fun TimedTaskBlock(
                             )
                         }
                     }
-                    TimedTaskProgress(task)
+                    TimedTaskProgress(task, onSubtaskToggle)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = {
                             val earlier = start.minusMinutes(15)
@@ -364,21 +365,30 @@ private fun TimedTaskBlock(
 }
 
 @Composable
-private fun TimedTaskProgress(task: Task) {
+private fun TimedTaskProgress(task: Task, onSubtaskToggle: (String, String) -> Unit) {
     if (task.subtasks.isEmpty()) return
     val completed = task.subtasks.count { it.completed }
     val firstPending = task.subtasks.firstOrNull { !it.completed }
+    val dependency = firstPending?.dependsOnId?.let { id -> task.subtasks.firstOrNull { it.id == id } }
+    val blocked = dependency != null && !dependency.completed
     Column(Modifier.fillMaxWidth().padding(start = 48.dp, top = 3.dp, end = 4.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("$completed / ${task.subtasks.size} pasos", color = if (completed == task.subtasks.size) Leaf else MutedInk, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
-            if (firstPending != null) Text("Siguiente", color = Coral, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            if (firstPending != null) {
+                TextButton(
+                    onClick = { onSubtaskToggle(task.id, firstPending.id) },
+                    enabled = !blocked,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(if (blocked) "Bloqueado" else "Completar paso", color = if (blocked) MutedInk else Coral, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
         if (firstPending != null) {
-            val dependency = firstPending.dependsOnId?.let { id -> task.subtasks.firstOrNull { it.id == id } }
             Text(
-                if (dependency != null && !dependency.completed) "🔒 ${firstPending.title} · espera «${dependency.title}»" else "→ ${firstPending.title}",
-                color = if (dependency != null && !dependency.completed) Coral else Ink,
+                if (blocked) "🔒 ${firstPending.title} · espera «${dependency?.title}»" else "→ ${firstPending.title}",
+                color = if (blocked) Coral else Ink,
                 fontSize = 11.sp,
                 maxLines = 1
             )

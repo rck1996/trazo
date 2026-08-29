@@ -5,74 +5,99 @@
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3f7356)](https://developer.android.com/about/versions/oreo)
 [![Offline](https://img.shields.io/badge/datos-100%25%20local-d95f4b)](#privacidad)
 
-Trazo es una aplicación Android offline para gestionar tareas y hábitos sin cuentas, anuncios ni conexión. Su interfaz mezcla un cuaderno de papel con trazos imperfectos, colores cálidos y microinteracciones discretas.
+Trazo es una aplicación Android para organizar tareas, hábitos, calendario y sesiones de enfoque en un único espacio privado. Funciona sin cuenta ni conexión y combina una experiencia moderna con ilustraciones tipo *sketch*, papel pautado y microinteracciones discretas.
 
-## La app
+## La experiencia
 
 <p align="center">
-  <img src="artifacts/Trazo-visible-today.png" width="29%" alt="Centro de herramientas visible en Hoy" />
-  <img src="artifacts/Trazo-premium-month.png" width="29%" alt="Calendario mensual con carga por tiempo y selección clara" />
-  <img src="artifacts/Trazo-3.3.0-today.png" width="29%" alt="Pantalla Hoy de Trazo" />
+  <img src="artifacts/Trazo-3.8.0-today.png" width="29%" alt="Pantalla Hoy con progreso, accesos rápidos y revisión diaria" />
+  <img src="artifacts/Trazo-3.8.0-tasks.png" width="29%" alt="Lista de tareas con búsqueda, filtros y acciones" />
+  <img src="artifacts/Trazo-3.8.0-habits.png" width="29%" alt="Hábitos medibles con rachas y progreso diario" />
 </p>
 
-La galería usa capturas reales de la aplicación ejecutándose en un teléfono Android. La interfaz también dispone de planner, widgets interactivos, tema claro/oscuro y modo minimalista monocromático.
+**Hoy** reúne lo que importa, **Tareas** permite planificar desde una acción sencilla hasta un proyecto con subtareas y **Hábitos** muestra metas, rachas y registros diarios sin perder el estilo de cuaderno dibujado.
 
-## Descargar e instalar
+## Planificación que se entiende de un vistazo
 
-Descarga el APK desde la [última versión publicada](https://github.com/rck1996/trazo/releases/latest). En Android, permite temporalmente la instalación desde la aplicación con la que abras el archivo y toca el APK para instalarlo.
+<p align="center">
+  <img src="artifacts/Trazo-premium-month.png" width="29%" alt="Mes con mapa de carga, tareas, hábitos y subtareas" />
+  <img src="artifacts/Trazo-premium-conflict.png" width="29%" alt="Semana con navegación directa al primer conflicto horario" />
+  <img src="artifacts/Trazo-premium-day.png" width="29%" alt="Agenda diaria compacta con conflictos señalados" />
+</p>
 
-> Los APK actuales son compilaciones de prueba firmadas localmente y pensadas para instalación directa. No son paquetes de Google Play.
+El calendario ofrece tres niveles complementarios:
+
+- **Agenda diaria:** bloques por hora, progreso de subtareas y conflictos visibles.
+- **Semana:** carga planificada, hueco disponible y acceso directo al primer cruce.
+- **Mes:** intensidad por tiempo pendiente y progreso separado de tareas, hábitos y subtareas.
+
+Los bloques se pueden reprogramar con precisión de 15 minutos y las tareas sin hora siguen formando parte de la carga real del día.
+
+## Captura y enfoque
+
+<p align="center">
+  <img src="artifacts/Trazo-3.8.0-capture.png" width="29%" alt="Captura inteligente de tareas y hábitos por texto o voz" />
+  <img src="artifacts/Trazo-3.8.0-focus.png" width="29%" alt="Pomodoro ilustrado con tarea asociada y pantalla siempre activa" />
+  <img src="artifacts/Trazo-3.8.0-settings.png" width="29%" alt="Centro de avisos con notificaciones y alarmas configurables" />
+</p>
+
+- La captura inteligente interpreta frases en español como `Spinning lunes miércoles viernes` o `Informe viernes a las 16` y permite dictarlas por voz.
+- El Pomodoro admite ciclos `25/5`, `50/10` y tiempos personalizados, tarea asociada, pausa/reinicio correctos, notificación persistente y modo de pantalla siempre activa.
+- La ilustración cambia entre enfoque y descanso, respeta el movimiento reducido y mantiene disponible un modo minimalista monocromático.
+- Cada tarea o hábito puede usar notificación, alarma previa, alarma a la hora o ambas, independientemente de la preferencia general.
 
 ## Funciones incluidas
 
-- Crear, completar y eliminar tareas, con nota y marca de importancia.
-- Dividir una tarea en subtareas marcables; el progreso aparece como `2/5` en tareas, agenda y planner.
-- Organizar subtareas dependientes y recibir una confirmación al terminar toda la lista.
-- Reutilizar configuraciones completas mediante plantillas y categorías compartidas editables.
-- Crear hábitos con símbolo, categoría visual y días personalizados.
-- Marcar el cumplimiento diario y calcular rachas según los días programados.
-- Vista «Hoy» que reúne lo accionable y muestra progreso inmediato.
-- Persistencia local privada en JSON versionado mediante `SharedPreferences`.
-- Estados vacíos accionables, navegación clara y controles accesibles.
-- Fechas opcionales y reprogramables para cada tarea.
-- Calendario con agenda diaria, planner semanal y mapa mensual de carga con progreso de tareas, hábitos y subtareas.
-- Navegación premium de conflictos: Semana salta al primer cruce y Agenda identifica todos los bloques involucrados.
-- Agenda horaria diaria con bloques calculados por duración y reprogramación rápida.
-- Arrastrar bloques del planner entre horas y días con precisión de 15 minutos.
-- Pomodoro 25/5 o 50/10 asociado a una tarea pendiente.
-- Centro de avisos con diagnóstico de permisos, próximo/último envío y prueba audible del modo elegido.
-- Activar una alarma crítica por elemento con pantalla completa, completar y posponer.
-- Resolver pendientes desde un cierre nocturno configurable.
-- Agenda matinal y cierre del día independientes, con cualquier hora en formato `HH:MM`.
-- Notificación persistente mientras el Pomodoro está activo.
-- Ilustraciones originales estilo sketch para tomate, taza, encabezados y widgets, integradas sin conexión.
-- Edición completa de tareas y hábitos conservando su historial.
-- Duraciones Pomodoro personalizadas entre 1–180 minutos de enfoque y 1–60 de pausa.
-- Widget de inicio con agenda del día, pilas deslizables de tareas y hábitos, acciones rápidas y accesos a Planner/Enfoque.
-- Inicio reconstruido como un estudio diario: progreso circular animado, acciones rápidas y mensajes adaptativos.
-- Filtros de tareas, historial visual de siete días y resumen de rachas para hábitos.
-- Filtros combinables por estado, fecha y prioridad, más avance global de checklists.
-- Transiciones direccionales entre secciones, cambio animado del calendario y respiración orgánica del Pomodoro.
-- Seis widgets independientes e interactivos: resumen del día, hábito rápido, temporizador, tres próximas tareas, jardín de rituales y captura inteligente por voz.
-- Modo Pomodoro de pantalla siempre activa, con brillo tenue, reloj OLED y dibujo animado adaptado a enfoque o descanso.
-- Widget principal adaptativo: reparte su altura según el contenido y ofrece configuración independiente de secciones, prioridad compacta, Pomodoro, color y cantidad de tarjetas.
-- Ilustraciones sketch por categoría de hábito: Hidratación, Autocuidado, Alimentación, Movimiento y Descanso.
-- Copia de seguridad JSON local mediante los selectores de exportación e importación de Android.
-- Recordatorios por tarea o hábito con cuatro entregas elegibles: notificación normal, alarma previa, alarma a la hora o ambas alarmas. La anticipación (5–30 min) y la duración sonora (15–60 s) son configurables; incluyen recuperación tras reinicio y acciones «Hecho», `+10 min` y `+30 min`.
-- Cada tarea y hábito puede elegir su propio modo de recordatorio, independientemente de la preferencia general.
-- Hábitos medibles por veces, minutos o pasos, con meta personalizada y progreso diario.
-- Captura inteligente en español con fechas, horas, prioridad y etiquetas, además de dictado por voz.
-- Búsqueda por texto y etiquetas, archivo, papelera recuperable y acción Deshacer.
-- Estadísticas semanales de tareas, hábitos y Pomodoro.
-- Tema claro/oscuro/de sistema con contraste adaptado, texto ampliado, movimiento reducido y respuesta háptica configurable.
+### Tareas y organización
 
-## Ejecutar
+- Crear, editar, completar, archivar, restaurar y eliminar tareas con acción **Deshacer**.
+- Fechas, horas, duración, prioridad, repetición, categorías, etiquetas y notas.
+- Subtareas marcables con progreso `2/5` y dependencias entre pasos.
+- Plantillas reutilizables y filtros combinables por texto, estado, fecha y prioridad.
+- Archivo independiente de la papelera y copias de seguridad JSON importables.
+
+### Hábitos
+
+- Días personalizados, intervalos semanales y excepciones concretas.
+- Metas por veces, minutos o pasos con ajuste directo del progreso.
+- Rachas calculadas sólo sobre días programados e historial visual semanal.
+- Categorías compartidas e ilustraciones para hidratación, movimiento, autocuidado, alimentación y descanso.
+
+### Avisos y seguimiento
+
+- Alarmas puntuales incluso con la app cerrada, recuperación tras reinicio y acciones `Hecho`, `+10 min` y `+30 min`.
+- Diagnóstico de permisos, próximo aviso, último envío y prueba audible del modo elegido.
+- Resumen matinal, cierre nocturno configurable y estadísticas semanales de tareas, hábitos y Pomodoro.
+- Seis widgets interactivos: resumen diario, hábito rápido, temporizador, próximas tareas, jardín de rituales y captura inteligente.
+
+### Apariencia y accesibilidad
+
+- Tema claro, oscuro o de sistema con contraste adaptado.
+- Modo minimalista completamente blanco y negro.
+- Texto ampliado, animaciones reducidas y respuesta háptica configurable.
+- Estados vacíos accionables, objetivos táctiles amplios y descripciones para controles principales.
+
+## Descargar e instalar
+
+Descarga el APK desde la [última versión publicada en GitHub](https://github.com/rck1996/trazo/releases/latest). La compilación verificada de esta documentación también está disponible como [Trazo 3.8.0 en Google Drive](https://drive.google.com/file/d/1jvf5sLjuhvF-vkcWpzZ_ZYqx-WdnCKmp/view?usp=drivesdk).
+
+En Android, permite temporalmente la instalación desde la aplicación con la que abras el archivo y toca el APK para instalarlo.
+
+> Los APK actuales son compilaciones de prueba firmadas localmente y pensadas para instalación directa. No son paquetes de Google Play.
+
+## Ejecutar el proyecto
 
 1. Abre esta carpeta con Android Studio Quail 1 (2026.1.1) o compatible.
-2. Usa JDK 17 y permite que Android Studio instale Android SDK 36.0 si lo solicita.
+2. Usa JDK 17 y permite que Android Studio instale Android SDK 36 si lo solicita.
 3. Sincroniza Gradle y ejecuta el módulo `app` en un emulador o dispositivo Android 8.0+.
 
-El proyecto fija AGP 9.2.1, Gradle 9.4.1, Kotlin/Compose Compiler 2.3.21, Android SDK 36.0 estable y Compose BOM 2026.06.00.
+El proyecto utiliza AGP 9.2.1, Gradle 9.4.1, Kotlin/Compose Compiler 2.3.21, Android SDK 36 y Compose BOM 2026.06.00.
+
+Para instalar la compilación local mediante ADB:
+
+```powershell
+adb install -r -t artifacts\Trazo-3.8.0-debug.apk
+```
 
 ## Arquitectura mínima
 
@@ -82,39 +107,46 @@ UI Compose → TrazoViewModel → LocalStore → SharedPreferences / JSON
                modelos inmutables
 ```
 
-No se añadieron cuentas, red, analítica, inyección de dependencias ni base de datos: el tamaño actual no los justifica. `LocalStore` mantiene un campo de versión para permitir migraciones y copias portables.
+Trazo no incorpora cuentas, red, analítica, inyección de dependencias ni una base de datos innecesaria. `LocalStore` mantiene un campo de versión para permitir migraciones y copias portables.
 
 ## Privacidad
 
-Trazo no crea cuentas, no contiene analítica y no envía tareas, hábitos, grabaciones ni estadísticas a servidores. La captura por voz usa el reconocedor configurado en Android y la aplicación conserva únicamente el texto confirmado. Las copias de seguridad solo se crean cuando la persona las exporta mediante el selector de archivos del sistema.
+Trazo no crea cuentas ni envía tareas, hábitos, grabaciones o estadísticas a servidores. La captura por voz usa el reconocedor configurado en Android y conserva únicamente el texto confirmado. Las copias de seguridad sólo se crean cuando la persona las exporta mediante el selector de archivos del sistema.
 
 ## Verificación
 
-Desde Android Studio o con el Gradle Wrapper incluido:
+La versión 3.8.0 fue comprobada con datos densos y conflictos horarios en un emulador Pixel API 35. La validación incluye:
 
 ```bash
-./gradlew test
+./gradlew testDebugUnitTest
+./gradlew lintDebug
 ./gradlew assembleDebug
+./gradlew connectedDebugAndroidTest
 ```
 
-El APK instalable más reciente también se copia a `artifacts/Trazo-3.5.0-debug.apk`.
+- Pruebas unitarias de rachas, recurrencia, parser, filtros, alarmas, transiciones de Pomodoro y calendario.
+- Android Lint y compilación completa del APK.
+- Cuatro pruebas instrumentadas de navegación, calendario mensual y subtareas.
+- Revisión visual de Hoy, Tareas, Hábitos, Captura, Enfoque, Ajustes y las tres vistas del calendario.
 
-Para instalarlo por USB con el teléfono autorizado:
-
-```powershell
-adb install -r -t artifacts\Trazo-3.5.0-debug.apk
-```
-
-Las pruebas unitarias cubren el cálculo de rachas, incluidos días no programados y días omitidos.
+Consulta [docs/BITACORA.md](docs/BITACORA.md) para seguir el desarrollo y [docs/VALIDACION.md](docs/VALIDACION.md) para revisar la evidencia de pruebas.
 
 ## CI/CD
 
-- Cada push o pull request hacia `main` ejecuta pruebas unitarias, Android Lint y la compilación del APK; los reportes y el APK quedan como artefactos temporales de GitHub Actions.
-- Dependabot revisa semanalmente las dependencias de Gradle y de GitHub Actions.
-- Una etiqueta semántica como `v3.4.1` valida que versión, código y APK coincidan, vuelve a ejecutar las comprobaciones y publica automáticamente el APK junto con su checksum SHA-256.
+- Cada *push* o *pull request* hacia `main` ejecuta pruebas unitarias, Android Lint y compilación del APK.
+- Dependabot revisa semanalmente las dependencias de Gradle y GitHub Actions.
+- Una etiqueta semántica `vX.Y.Z` comprueba que versión, código y APK coincidan y publica el instalador con su checksum SHA-256.
 
-Para preparar una versión nueva, actualiza `versionCode` y `versionName`, genera `artifacts/Trazo-X.Y.Z-debug.apk`, confirma los cambios y crea la etiqueta `vX.Y.Z`.
+## Próxima etapa: una experiencia más personal
 
-Consulta [docs/BITACORA.md](docs/BITACORA.md) para ver el desarrollo y las decisiones paso a paso.
+La siguiente evolución de Trazo se centrará en simplificar sin perder potencia. Esta etapa está **planificada, todavía no implementada**, y contempla:
 
-Consulta [docs/VALIDACION.md](docs/VALIDACION.md) para ver la prueba automatizada y el recorrido realizado en el teléfono.
+- Tres composiciones de Hoy: **Enfoque**, **Equilibrado** y **Panorama**.
+- Ajustes organizados como secciones completas en lugar de una única hoja extensa.
+- Creación progresiva: lo esencial primero y las opciones avanzadas bajo demanda.
+- Introducción breve para usuarios nuevos y recorrido opcional de novedades.
+- Búsqueda y filtros consistentes en tareas, hábitos y calendario.
+- Alternativa accesible al arrastre para mover bloques de la agenda.
+- Una composición de Pomodoro todavía más limpia y mayor cobertura con TalkBack.
+
+La prioridad seguirá siendo la misma: una aplicación privada, rápida, artística y serena que ayude a avanzar un trazo a la vez.

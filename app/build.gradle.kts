@@ -12,8 +12,8 @@ android {
         applicationId = "com.trazo.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 26
-        versionName = "3.5.0"
+        versionCode = 27
+        versionName = "3.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

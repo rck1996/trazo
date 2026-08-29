@@ -125,6 +125,8 @@ import com.trazo.app.model.TaskPriority
 import com.trazo.app.model.TaskRecurrence
 import com.trazo.app.model.TaskSubtask
 import com.trazo.app.model.TaskSchedule
+import com.trazo.app.model.CategoryDefinition
+import com.trazo.app.model.TaskTemplate
 import com.trazo.app.model.TrazoState
 import com.trazo.app.notifications.NotificationCenter
 import com.trazo.app.notifications.ReminderHistory
@@ -200,6 +202,7 @@ fun TrazoApp(
     val activeTasks = state.tasks.filter { !it.archived && it.deletedAt == null }
     val activeHabits = state.habits.filter { !it.archived && it.deletedAt == null }
     val undo = viewModel.undoAction.value
+    val parentSuggestion = viewModel.parentCompletionSuggestion.value
     LaunchedEffect(undo) {
         undo?.let {
             val result = snackbar.showSnackbar(it.message, "Deshacer")
@@ -285,7 +288,10 @@ fun TrazoApp(
             task = editingTask,
             draft = taskDraft,
             initialDate = taskComposerDate,
+            categories = state.categories,
+            templates = state.taskTemplates,
             onDismiss = { composer = null; editingTask = null },
+            onSaveTemplate = viewModel::saveTaskTemplate,
             onSave = { input ->
                 editingTask?.let { viewModel.updateTask(it.id, input) }
                     ?: viewModel.addTask(input)
@@ -307,6 +313,15 @@ fun TrazoApp(
             }
         )
         null -> Unit
+    }
+    if (parentSuggestion != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissParentCompletionSuggestion,
+            title = { Text("Lista completa") },
+            text = { Text("Terminaste todas las subtareas. ¿Quieres marcar también la tarea principal como completada?") },
+            confirmButton = { TextButton(onClick = viewModel::completeSuggestedParent) { Text("Completar tarea") } },
+            dismissButton = { TextButton(onClick = viewModel::dismissParentCompletionSuggestion) { Text("Ahora no") } }
+        )
     }
 }
 
@@ -407,6 +422,7 @@ private fun TodayScreen(
     val dueHabits = habits.filter { HabitProgress.isScheduled(it, today) }
     val done = relevantTasks.count { it.completed } + dueHabits.count { HabitProgress.isComplete(it, today) }
     val total = relevantTasks.size + dueHabits.size
+    val appSettings by viewModel.settings
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 96.dp)
@@ -432,6 +448,14 @@ private fun TodayScreen(
                 focusMinutes = periodFocusMinutes,
                 onOpenPlanner = onOpenPlanner
             )
+            if (appSettings.nightReviewEnabled && LocalTime.now().hour >= appSettings.nightReviewHour && pending.isNotEmpty()) {
+                NightReviewCard(
+                    tasks = pending,
+                    onComplete = viewModel::toggleTask,
+                    onTomorrow = { viewModel.setTaskDate(it, today.plusDays(1)) },
+                    onArchive = viewModel::archiveTask
+                )
+            }
             SectionTitle("Siguiente trazo", "solo lo que importa ahora")
         }
         if (pending.isEmpty()) item { EmptyNote("Tu lista respira", "Anota una tarea pequeña para empezar.", onAddTask, R.drawable.widget_ai_task) }
@@ -465,6 +489,36 @@ private fun TodayScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun NightReviewCard(
+    tasks: List<Task>,
+    onComplete: (String) -> Unit,
+    onTomorrow: (String) -> Unit,
+    onArchive: (String) -> Unit
+) {
+    Surface(
+        color = Lavender.copy(alpha = .13f),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 7.dp).fillMaxWidth().sketchBorder(Lavender.copy(alpha = .35f))
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("CIERRE DEL DÍA", color = Lavender, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.1.sp)
+            Text("Deja mañana despejado", color = Ink, fontWeight = FontWeight.Black, fontSize = 18.sp)
+            Text("Completa, mueve o archiva lo que quedó pendiente.", color = MutedInk, fontSize = 12.sp)
+            tasks.take(4).forEach { task ->
+                Column(Modifier.fillMaxWidth().padding(top = 9.dp)) {
+                    Text(task.title, color = Ink, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        TextButton(onClick = { onComplete(task.id) }) { Text("Hecho", color = Leaf) }
+                        TextButton(onClick = { onTomorrow(task.id) }) { Text("Mañana", color = Coral) }
+                        TextButton(onClick = { onArchive(task.id) }) { Text("Archivar", color = MutedInk) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -660,6 +714,7 @@ private fun SettingsSheet(
     onImport: () -> Unit,
     viewModel: TrazoViewModel
 ) {
+    var newCategoryName by remember { mutableStateOf("") }
     val state by viewModel.state
     val settings by viewModel.settings
     val stats = viewModel.focusStats()
@@ -711,6 +766,51 @@ private fun SettingsSheet(
                     SettingsToggle("Minimalista blanco y negro", settings.minimalMode) { viewModel.updateSettings(settings.copy(minimalMode = it)) }
                     SettingsToggle("Reducir animaciones", settings.reducedMotion) { viewModel.updateSettings(settings.copy(reducedMotion = it)) }
                     SettingsToggle("Respuesta háptica", settings.haptics) { viewModel.updateSettings(settings.copy(haptics = it)) }
+                }
+            }
+            Text("ORGANIZACIÓN", color = Leaf, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
+            Surface(color = Leaf.copy(alpha = .09f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("Categorías compartidas", fontWeight = FontWeight.Bold)
+                    Text("Se usan en tareas, hábitos y plantillas.", color = MutedInk, fontSize = 11.sp)
+                    state.categories.forEach { category ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("${category.symbol} ${category.name}", modifier = Modifier.weight(1f), color = Ink)
+                            if (category.id != "general") TextButton(onClick = { viewModel.deleteCategory(category.id) }) { Text("Eliminar", color = Coral, fontSize = 11.sp) }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(newCategoryName, { newCategoryName = it }, label = { Text("Nueva categoría") }, singleLine = true, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { viewModel.addCategory(newCategoryName); newCategoryName = "" }, enabled = newCategoryName.isNotBlank()) { Text("Añadir") }
+                    }
+                    if (state.taskTemplates.isNotEmpty()) {
+                        Text("Plantillas de tarea", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+                        state.taskTemplates.forEach { template ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("✦ ${template.name}", modifier = Modifier.weight(1f))
+                                TextButton(onClick = { viewModel.deleteTaskTemplate(template.id) }) { Text("Eliminar", color = Coral, fontSize = 11.sp) }
+                            }
+                        }
+                    }
+                }
+            }
+            Text("REVISIÓN NOCTURNA", color = Lavender, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
+            Surface(color = Lavender.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    SettingsToggle("Mostrar cierre del día", settings.nightReviewEnabled) {
+                        viewModel.updateSettings(settings.copy(nightReviewEnabled = it))
+                    }
+                    Text("Hora de aparición", color = MutedInk, fontSize = 12.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf(18, 20, 21, 22).forEach { hour ->
+                            val selected = settings.nightReviewHour == hour
+                            TextButton(
+                                onClick = { viewModel.updateSettings(settings.copy(nightReviewHour = hour)) },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("%02d:00".format(hour), color = if (selected) Coral else MutedInk, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
+                        }
+                    }
+                    Text("Aparece en Hoy para completar, pasar a mañana o archivar pendientes.", color = MutedInk, fontSize = 11.sp)
                 }
             }
             Text("ESTADÍSTICAS · ÚLTIMOS 7 DÍAS", color = Mustard, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
@@ -1694,23 +1794,49 @@ private fun SketchNavigation(selected: Section, onSelect: (Section) -> Unit) {
 }
 
 @Composable
-private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?, onDismiss: () -> Unit, onSave: (TaskInput) -> Unit) {
+private fun TaskComposer(
+    task: Task?, draft: TaskInput?, initialDate: LocalDate?,
+    categories: List<CategoryDefinition>, templates: List<TaskTemplate>,
+    onDismiss: () -> Unit, onSaveTemplate: (String, TaskInput) -> Unit,
+    onSave: (TaskInput) -> Unit
+) {
     var title by remember(task, draft) { mutableStateOf(task?.title ?: draft?.title.orEmpty()) }
     var note by remember(task, draft) { mutableStateOf(task?.note ?: draft?.note.orEmpty()) }
     var important by remember(task, draft) { mutableStateOf(task?.priority == TaskPriority.IMPORTANT || draft?.important == true) }
     var dueDate by remember(task, draft, initialDate) { mutableStateOf(task?.dueDate ?: draft?.dueDate ?: initialDate) }
     var durationMinutes by remember(task, draft) { mutableIntStateOf(task?.durationMinutes ?: draft?.durationMinutes ?: 25) }
     var recurrence by remember(task, draft) { mutableStateOf(task?.recurrence ?: draft?.recurrence ?: TaskRecurrence.NONE) }
+    var categoryId by remember(task, draft) { mutableStateOf(task?.categoryId ?: draft?.categoryId ?: "general") }
     var subtasksText by remember(task, draft) { mutableStateOf(task?.subtasks?.joinToString("\n") { it.title } ?: draft?.subtasks?.joinToString("\n") { it.title } ?: "") }
     var reminderHour by remember(task, draft) { mutableStateOf(task?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(task, draft) { mutableIntStateOf(task?.reminderMinute ?: draft?.reminderMinute ?: 0) }
     var reminderMode by remember(task, draft) { mutableStateOf(task?.reminderMode ?: draft?.reminderMode) }
+    var criticalAlarm by remember(task, draft) { mutableStateOf(task?.criticalAlarm ?: draft?.criticalAlarm ?: false) }
     var reminderText by remember(task, draft) { mutableStateOf((task?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, task?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
     var tags by remember(task, draft) { mutableStateOf((task?.tags ?: draft?.tags.orEmpty()).joinToString(", ")) }
     var showDatePicker by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper) {
         ComposerLayout(if (task == null) "Nueva tarea" else "Editar tarea", if (task == null) "Sácala de tu cabeza y déjala aquí." else "Ajusta lo que necesites.") {
+            if (task == null && templates.isNotEmpty()) {
+                Text("Plantillas", color = MutedInk, fontSize = 12.sp)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    templates.forEach { template ->
+                        Surface(onClick = {
+                            title = template.title; note = template.note
+                            important = template.priority == TaskPriority.IMPORTANT
+                            durationMinutes = template.durationMinutes; recurrence = template.recurrence
+                            categoryId = template.categoryId
+                            subtasksText = template.subtasks.joinToString("\n") { it.title }
+                            reminderHour = template.reminderHour; reminderMinute = template.reminderMinute
+                            reminderMode = template.reminderMode; tags = template.tags.joinToString(", ")
+                            reminderText = template.reminderHour?.let { "%02d:%02d".format(it, template.reminderMinute) }.orEmpty()
+                        }, color = Leaf.copy(alpha = .12f), shape = RoundedCornerShape(12.dp)) {
+                            Text("✦ ${template.name}", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = Ink)
+                        }
+                    }
+                }
+            }
             OutlinedTextField(
                 value = title, onValueChange = { title = it }, label = { Text("¿Qué quieres hacer?") },
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -1723,6 +1849,15 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                 )
+                Text("Categoría", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    categories.forEach { category ->
+                        val selected = category.id == categoryId
+                        Surface(onClick = { categoryId = category.id }, color = if (selected) Leaf else Ink.copy(alpha = .05f), shape = RoundedCornerShape(10.dp)) {
+                            Text("${category.symbol} ${category.name}", color = if (selected) Color.White else Ink, modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp), fontSize = 11.sp)
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = subtasksText, onValueChange = { subtasksText = it },
                     label = { Text("Subtareas (una por línea)") },
@@ -1814,12 +1949,23 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
                 }
             }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
             ReminderReadinessNote(reminderHour != null)
-            if (reminderHour != null) ItemReminderModePicker(reminderMode) { reminderMode = it }
+            if (reminderHour != null) {
+                ItemReminderModePicker(reminderMode) { reminderMode = it }
+                SettingsToggle("Alarma crítica · pantalla completa", criticalAlarm) { criticalAlarm = it }
+            }
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+            if (task == null && title.isNotBlank()) {
+                TextButton(onClick = {
+                    onSaveTemplate(title, TaskInput(title, note, important, dueDate, durationMinutes, recurrence, categoryId,
+                        subtasksText.lines().mapNotNull { it.trim().takeIf(String::isNotBlank) }.map { TaskSubtask(title = it) },
+                        reminderHour, reminderMinute, reminderMode, criticalAlarm, parseTags(tags)))
+                }, modifier = Modifier.fillMaxWidth()) { Text("Guardar configuración como plantilla", color = Leaf) }
+            }
             SaveButton(if (task == null) "Guardar tarea" else "Guardar cambios", title.isNotBlank()) {
                 onSave(TaskInput(title = title, note = note, important = important, dueDate = dueDate,
-                    durationMinutes = durationMinutes, recurrence = recurrence, reminderHour = reminderHour,
+                    durationMinutes = durationMinutes, recurrence = recurrence, categoryId = categoryId, reminderHour = reminderHour,
                     reminderMinute = reminderMinute, reminderMode = reminderMode.takeIf { reminderHour != null }, tags = parseTags(tags),
+                    criticalAlarm = criticalAlarm && reminderHour != null,
                     subtasks = subtasksText.lines().mapNotNull { it.trim().takeIf(String::isNotBlank) }.map { TaskSubtask(title = it) }))
             }
         }
@@ -1912,6 +2058,7 @@ private fun HabitComposer(
     var reminderHour by remember(habit, draft) { mutableStateOf(habit?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(habit, draft) { mutableIntStateOf(habit?.reminderMinute ?: draft?.reminderMinute ?: 0) }
     var reminderMode by remember(habit, draft) { mutableStateOf(habit?.reminderMode ?: draft?.reminderMode) }
+    var criticalAlarm by remember(habit, draft) { mutableStateOf(habit?.criticalAlarm ?: draft?.criticalAlarm ?: false) }
     var reminderText by remember(habit, draft) { mutableStateOf((habit?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, habit?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
     var tags by remember(habit, draft) { mutableStateOf((habit?.tags ?: draft?.tags.orEmpty()).joinToString(", ")) }
     val labels = mapOf(
@@ -2021,7 +2168,10 @@ private fun HabitComposer(
                 parsed?.let { (h, m) -> reminderHour = h; reminderMinute = m }
             }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
             ReminderReadinessNote(reminderHour != null)
-            if (reminderHour != null) ItemReminderModePicker(reminderMode) { reminderMode = it }
+            if (reminderHour != null) {
+                ItemReminderModePicker(reminderMode) { reminderMode = it }
+                SettingsToggle("Alarma crítica · pantalla completa", criticalAlarm) { criticalAlarm = it }
+            }
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
             Spacer(Modifier.height(22.dp))
             SaveButton(if (habit == null) "Crear hábito" else "Guardar cambios", title.isNotBlank() && days.isNotEmpty()) {
@@ -2032,6 +2182,7 @@ private fun HabitComposer(
                     target = target, unit = unit,
                     reminderHour = reminderHour, reminderMinute = reminderMinute,
                     reminderMode = reminderMode.takeIf { reminderHour != null },
+                    criticalAlarm = criticalAlarm && reminderHour != null,
                     tags = parseTags(tags)
                 ))
             }

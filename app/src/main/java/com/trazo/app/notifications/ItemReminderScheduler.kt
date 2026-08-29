@@ -318,6 +318,11 @@ class ItemReminderReceiver : BroadcastReceiver() {
             is Habit -> ItemReminderScheduler.effectiveDeliveryMode(item.reminderMode, settings)
             else -> settings.deliveryMode
         }
+        val criticalAlarm = when (item) {
+            is Task -> item.criticalAlarm
+            is Habit -> item.criticalAlarm
+            else -> false
+        }
         val alarmMode = when (stage) {
             "early" -> true
             "snooze" -> itemMode.usesAlarm
@@ -355,6 +360,19 @@ class ItemReminderReceiver : BroadcastReceiver() {
             .addAction(0, "+10 min", actionIntent(context, ACTION_SNOOZE, kind, id, 10, eventAt.toMillis()))
             .addAction(0, "+30 min", actionIntent(context, ACTION_SNOOZE, kind, id, 30, eventAt.toMillis()))
         if (alarmMode) builder.setTimeoutAfter(AlarmNotificationPolicy.timeoutMillis(settings.alarmDurationSeconds))
+        if (alarmMode && criticalAlarm) {
+            val fullScreen = PendingIntent.getActivity(
+                context,
+                "critical:$kind:$id".hashCode(),
+                Intent(context, CriticalAlarmActivity::class.java)
+                    .putExtra(CriticalAlarmActivity.EXTRA_TITLE, title)
+                    .putExtra(EXTRA_KIND, kind)
+                    .putExtra(EXTRA_ID, id)
+                    .putExtra(EXTRA_EVENT_AT, eventAt.toMillis()),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.setFullScreenIntent(fullScreen, true)
+        }
         val notification = builder.build().apply {
                 if (alarmMode) flags = flags or Notification.FLAG_INSISTENT
             }

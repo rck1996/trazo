@@ -27,6 +27,8 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 
 - Crear, completar y eliminar tareas, con nota y marca de importancia.
 - Dividir una tarea en subtareas marcables; el progreso aparece como `2/5` en tareas, agenda y planner.
+- Organizar subtareas dependientes y recibir una confirmación al terminar toda la lista.
+- Reutilizar configuraciones completas mediante plantillas y categorías compartidas editables.
 - Crear hábitos con símbolo, categoría visual y días personalizados.
 - Marcar el cumplimiento diario y calcular rachas según los días programados.
 - Vista «Hoy» que reúne lo accionable y muestra progreso inmediato.
@@ -35,8 +37,11 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 - Fechas opcionales y reprogramables para cada tarea.
 - Calendario con agenda diaria, planner semanal y vista mensual.
 - Agenda horaria diaria con bloques calculados por duración y reprogramación rápida.
+- Arrastrar bloques del planner entre horas y días con precisión de 15 minutos.
 - Pomodoro 25/5 o 50/10 asociado a una tarea pendiente.
 - Centro de avisos con diagnóstico de permisos, próximo/último envío y prueba audible del modo elegido.
+- Activar una alarma crítica por elemento con pantalla completa, completar y posponer.
+- Resolver pendientes desde un cierre nocturno configurable.
 - Agenda matinal y cierre del día independientes, con cualquier hora en formato `HH:MM`.
 - Notificación persistente mientras el Pomodoro está activo.
 - Ilustraciones originales estilo sketch para tomate, taza, encabezados y widgets, integradas sin conexión.

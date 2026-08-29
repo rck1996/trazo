@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,11 +41,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.trazo.app.model.Habit
 import com.trazo.app.model.HabitProgress
 import com.trazo.app.model.Task
@@ -234,19 +240,69 @@ private fun TimedTaskBlock(
     val minute = task.reminderMinute
     val start = LocalTime.of(hour, minute)
     val end = start.plusMinutes(task.durationMinutes.toLong())
-    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 5.dp), verticalAlignment = Alignment.Top) {
+    val density = LocalDensity.current
+    var dragOffset by remember(task.id, date, hour, minute) { mutableStateOf(Offset.Zero) }
+    var dragging by remember(task.id) { mutableStateOf(false) }
+    var blockWidth by remember(task.id) { mutableStateOf(1f) }
+    val pixelsPerMinute = with(density) { 1.2.dp.toPx() }
+    val dayWidth = (blockWidth * .72f).coerceAtLeast(with(density) { 96.dp.toPx() })
+    val drop = plannerDrop(date, hour, minute, dragOffset.x, dragOffset.y, dayWidth, pixelsPerMinute)
+    val previewStart = LocalTime.of(drop.hour, drop.minute)
+    val previewEnd = previewStart.plusMinutes(task.durationMinutes.toLong())
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 5.dp)
+            .onSizeChanged { blockWidth = it.width.toFloat() }
+            .zIndex(if (dragging) 2f else 0f)
+            .graphicsLayer {
+                translationX = if (dragging) dragOffset.x * .18f else 0f
+                translationY = if (dragging) dragOffset.y * .18f else 0f
+                alpha = if (dragging) .88f else 1f
+            }
+            .pointerInput(task.id, date, hour, minute, dayWidth, pixelsPerMinute) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { dragging = true },
+                    onDragCancel = { dragging = false; dragOffset = Offset.Zero },
+                    onDragEnd = {
+                        if (drop.date != date || drop.hour != hour || drop.minute != minute) {
+                            onReschedule(task.id, drop.date, drop.hour, drop.minute)
+                        }
+                        dragging = false
+                        dragOffset = Offset.Zero
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        dragOffset += amount
+                    }
+                )
+            },
+        verticalAlignment = Alignment.Top
+    ) {
         Column(Modifier.width(58.dp).padding(top = 13.dp)) {
-            Text(start.format(DateTimeFormatter.ofPattern("HH:mm")), color = Coral, fontWeight = FontWeight.Bold)
-            Text(end.format(DateTimeFormatter.ofPattern("HH:mm")), color = MutedInk, fontSize = 11.sp)
+            val shownStart = if (dragging) previewStart else start
+            val shownEnd = if (dragging) previewEnd else end
+            Text(shownStart.format(DateTimeFormatter.ofPattern("HH:mm")), color = Coral, fontWeight = FontWeight.Bold)
+            Text(shownEnd.format(DateTimeFormatter.ofPattern("HH:mm")), color = MutedInk, fontSize = 11.sp)
         }
         Column(Modifier.weight(1f)) {
-            Surface(color = PaperRaised, shape = RoundedCornerShape(13.dp), modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                color = if (dragging) Mustard.copy(alpha = .26f) else PaperRaised,
+                shape = RoundedCornerShape(13.dp),
+                modifier = Modifier.fillMaxWidth().height(plannerBlockHeightDp(task.durationMinutes).dp)
+            ) {
                 Column(Modifier.padding(10.dp)) {
                     Row(Modifier.clickable { onToggle(task.id) }, verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(task.completed, { onToggle(task.id) }, colors = CheckboxDefaults.colors(checkedColor = Leaf))
                         Column(Modifier.weight(1f)) {
                             Text(task.title, fontWeight = FontWeight.SemiBold)
-                            Text("${task.durationMinutes} min · bloque programado", color = MutedInk, fontSize = 11.sp)
+                            Text(
+                                if (dragging) {
+                                    val dayLabel = drop.date.format(DateTimeFormatter.ofPattern("EEE d", EsLocale))
+                                    "$dayLabel · ${previewStart.format(DateTimeFormatter.ofPattern("HH:mm"))}–${previewEnd.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+                                } else "${task.durationMinutes} min · mantén pulsado para mover",
+                                color = if (dragging) Coral else MutedInk,
+                                fontSize = 11.sp,
+                                fontWeight = if (dragging) FontWeight.Bold else FontWeight.Normal
+                            )
                         }
                     }
                     TaskChecklist(task, onSubtaskToggle, compact = true)

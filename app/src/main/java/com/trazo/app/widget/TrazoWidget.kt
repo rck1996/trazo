@@ -203,6 +203,16 @@ class TrazoWidget : AppWidgetProvider() {
                 in 12..19 -> "Tu tarde, de un vistazo"
                 else -> "Cierra el día con calma"
             }
+            val nextScheduledTask = pendingTasks
+                .filter { it.dueDate == today && it.reminderHour != null }
+                .minWithOrNull(compareBy<Task> { it.reminderHour }.thenBy { it.reminderMinute })
+            val agendaLabel = nextScheduledTask?.let { task ->
+                val time = "%02d:%02d".format(task.reminderHour, task.reminderMinute)
+                val progress = task.subtasks.takeIf { it.isNotEmpty() }
+                    ?.let { " · ${it.count { step -> step.completed }}/${it.size}" }
+                    .orEmpty()
+                "$time · ${task.title}$progress"
+            } ?: "▦  Planner"
 
             return RemoteViews(context.packageName, R.layout.trazo_widget).apply {
                 val minimal = config.style == WidgetStyle.MINIMAL
@@ -292,6 +302,7 @@ class TrazoWidget : AppWidgetProvider() {
                     R.id.widget_planner,
                     openSection(context, "CALENDAR", widgetId * 10 + 1)
                 )
+                setTextViewText(R.id.widget_planner, agendaLabel)
                 setOnClickPendingIntent(R.id.widget_focus_action, focusToggleIntent(context, widgetId))
                 setOnClickPendingIntent(
                     R.id.widget_task_empty,

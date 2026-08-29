@@ -9,7 +9,9 @@ data class AppSettings(
     val largeText: Boolean = false,
     val reducedMotion: Boolean = false,
     val haptics: Boolean = true,
-    val minimalMode: Boolean = false
+    val minimalMode: Boolean = false,
+    val nightReviewEnabled: Boolean = true,
+    val nightReviewHour: Int = 20
 )
 
 class AppSettingsStore(context: Context) {
@@ -22,7 +24,9 @@ class AppSettingsStore(context: Context) {
         largeText = preferences.getBoolean("large_text", false),
         reducedMotion = preferences.getBoolean("reduced_motion", false),
         haptics = preferences.getBoolean("haptics", true),
-        minimalMode = preferences.getBoolean("minimal_mode", false)
+        minimalMode = preferences.getBoolean("minimal_mode", false),
+        nightReviewEnabled = preferences.getBoolean("night_review_enabled", true),
+        nightReviewHour = preferences.getInt("night_review_hour", 20).coerceIn(17, 23)
     )
 
     fun save(settings: AppSettings) {
@@ -32,6 +36,8 @@ class AppSettingsStore(context: Context) {
             .putBoolean("reduced_motion", settings.reducedMotion)
             .putBoolean("haptics", settings.haptics)
             .putBoolean("minimal_mode", settings.minimalMode)
+            .putBoolean("night_review_enabled", settings.nightReviewEnabled)
+            .putInt("night_review_hour", settings.nightReviewHour.coerceIn(17, 23))
             .apply()
     }
 }

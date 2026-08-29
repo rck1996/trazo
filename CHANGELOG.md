@@ -1,5 +1,16 @@
 # Cambios
 
+## 3.6.0
+
+- Planner diario con bloques arrastrables entre horas y días, ajuste cada 15 minutos y vista previa antes de soltar.
+- Subtareas con dependencias opcionales y sugerencia para completar la tarea principal al cerrar la lista.
+- Categorías compartidas y editables para tareas, hábitos y plantillas.
+- Plantillas de tareas que reutilizan duración, recurrencia, categoría, checklist, etiquetas y recordatorios sin copiar la fecha absoluta.
+- Alarma crítica opcional por elemento, con pantalla completa y acciones para completar, posponer o abrir Trazo.
+- Revisión nocturna configurable para resolver pendientes al final del día.
+- Widget grande con la siguiente tarea horaria y progreso de subtareas.
+- Compatibilidad de alarma crítica desde Android 8 y pruebas de layout, lint e instrumentación en Pixel API 35.
+
 ## 3.5.0
 
 - Subtareas persistentes, editables y marcables desde las tarjetas de tareas.

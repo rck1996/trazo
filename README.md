@@ -139,14 +139,22 @@ Consulta [docs/BITACORA.md](docs/BITACORA.md) para seguir el desarrollo y [docs/
 
 ## Próxima etapa: una experiencia más personal
 
-La siguiente evolución de Trazo se centrará en simplificar sin perder potencia. Esta etapa está **planificada, todavía no implementada**, y contempla:
+La siguiente evolución de Trazo se centra en simplificar sin perder potencia. Esta etapa está **en desarrollo y pendiente de validación final**; no se anunciará como terminada hasta completar las pruebas visuales, instrumentadas y de actualización con datos existentes.
+
+Sus cuatro pilares son un inicio adaptable, creación sencilla, organización clara y accesibilidad. La implementación en validación contempla:
+
+<p align="center">
+  <img src="artifacts/Trazo-3.9.0-onboarding.png" width="29%" alt="Onboarding de Trazo con introducción breve" />
+  <img src="artifacts/Trazo-3.9.0-today-balanced.png" width="29%" alt="Diseño Equilibrado de Hoy" />
+  <img src="artifacts/Trazo-3.9.0-settings-sections.png" width="29%" alt="Ajustes a pantalla completa por subsecciones" />
+</p>
 
 - Tres composiciones de Hoy: **Enfoque**, **Equilibrado** y **Panorama**.
-- Ajustes organizados como secciones completas en lugar de una única hoja extensa.
+- Ajustes a pantalla completa, organizados en Avisos, Apariencia, Organización, Datos, Estadísticas, Archivados y Papelera.
 - Creación progresiva: lo esencial primero y las opciones avanzadas bajo demanda.
 - Introducción breve para usuarios nuevos y recorrido opcional de novedades.
 - Búsqueda y filtros consistentes en tareas, hábitos y calendario.
 - Alternativa accesible al arrastre para mover bloques de la agenda.
-- Una composición de Pomodoro todavía más limpia y mayor cobertura con TalkBack.
+- Una composición de Pomodoro más limpia, con ilustración, contador y tarea separados, y mayor cobertura con TalkBack.
 
 La prioridad seguirá siendo la misma: una aplicación privada, rápida, artística y serena que ayude a avanzar un trazo a la vez.

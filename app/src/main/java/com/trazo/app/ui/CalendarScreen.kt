@@ -33,7 +33,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -86,6 +88,9 @@ internal fun CalendarScreen(
     val reducedMotion = LocalReducedMotion.current
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
+    var query by remember { mutableStateOf("") }
+    val filteredTasks = tasks.filter { query.isBlank() || it.title.contains(query, true) || it.tags.any { tag -> tag.contains(query, true) } }
+    val filteredHabits = habits.filter { query.isBlank() || it.title.contains(query, true) || it.tags.any { tag -> tag.contains(query, true) } }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         CalendarTitle(selectedDate, mode, visibleMonth,
@@ -105,11 +110,19 @@ internal fun CalendarScreen(
             }
         )
         ModeSelector(mode) { mode = it }
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("Buscar en calendario") },
+            trailingIcon = { if (query.isNotBlank()) TextButton(onClick = { query = "" }) { Text("Limpiar", fontSize = 11.sp) } },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 3.dp)
+        )
         CalendarGuide(mode)
         if (mode == CalendarMode.PLANNER) CalendarContextAdd(selectedDate, onAddTask)
         if (mode != CalendarMode.MONTH) {
-            PlanningSummary(selectedDate, tasks)
-            UnscheduledTray(tasks.filter { !it.completed && it.dueDate == null }, selectedDate, onTaskReschedule, onEditTask)
+            PlanningSummary(selectedDate, filteredTasks)
+            UnscheduledTray(filteredTasks.filter { !it.completed && it.dueDate == null }, selectedDate, onTaskReschedule, onEditTask)
         }
         AnimatedContent(
             modifier = Modifier.weight(1f),
@@ -122,7 +135,7 @@ internal fun CalendarScreen(
         ) { currentMode ->
             when (currentMode) {
                 CalendarMode.DAY -> DayAgenda(
-                    selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle,
+                    selectedDate, filteredTasks, filteredHabits, padding, onTaskToggle, onHabitToggle,
                     onHabitExceptionToggle, onSubtaskToggle,
                     { id, newDate, hour, minute ->
                         onTaskReschedule(id, newDate, hour, minute)
@@ -133,13 +146,13 @@ internal fun CalendarScreen(
                     },
                     onEditTask, onAddTask
                 )
-                CalendarMode.PLANNER -> WeekPlanner(selectedDate, tasks, habits, padding, onTaskToggle, onEditTask) {
+                CalendarMode.PLANNER -> WeekPlanner(selectedDate, filteredTasks, filteredHabits, padding, onTaskToggle, onEditTask) {
                     selectedDate = it
                     visibleMonth = YearMonth.from(it)
                     mode = CalendarMode.DAY
                 }
                 CalendarMode.MONTH -> MonthGrid(
-                    visibleMonth, selectedDate, tasks, habits, padding,
+                    visibleMonth, selectedDate, filteredTasks, filteredHabits, padding,
                     onSelect = { selectedDate = it },
                     onOpenDay = { mode = CalendarMode.DAY },
                     onAddTask = { onAddTask(selectedDate) }
@@ -364,6 +377,10 @@ private fun TimedTaskBlock(
     val dragOffset = remember(task.id, date, hour, minute) { mutableStateOf(Offset.Zero) }
     var dragging by remember(task.id) { mutableStateOf(false) }
     var expanded by rememberSaveable(task.id) { mutableStateOf(false) }
+    var showMoveDialog by rememberSaveable(task.id) { mutableStateOf(false) }
+    var moveDate by remember(task.id, date) { mutableStateOf(date) }
+    var moveHour by remember(task.id, hour) { mutableStateOf(hour) }
+    var moveMinute by remember(task.id, minute) { mutableStateOf(minute) }
     val pixelsPerMinute = with(density) { 1.2.dp.toPx() }
     // A short horizontal gesture is enough to cross one day; the previous
     // card-width threshold made this practically unreachable on phones.
@@ -458,11 +475,50 @@ private fun TimedTaskBlock(
                             TextButton(onClick = { onReschedule(task.id, date.plusDays(1), hour, minute) }) {
                                 Text("Mañana", color = Leaf, fontSize = 11.sp)
                             }
+                            TextButton(onClick = {
+                                moveDate = date; moveHour = hour; moveMinute = minute; showMoveDialog = true
+                            }) { Text("Mover…", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                         }
                     }
                 }
             }
         }
+    }
+    if (showMoveDialog) {
+        AlertDialog(
+            onDismissRequest = { showMoveDialog = false },
+            title = { Text("Mover bloque") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("1. Elige el día", fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        TextButton(onClick = { moveDate = moveDate.minusDays(1) }) { Text("← Día") }
+                        Text(moveDate.format(DateTimeFormatter.ofPattern("EEE d MMM", EsLocale)), modifier = Modifier.padding(top = 12.dp))
+                        TextButton(onClick = { moveDate = moveDate.plusDays(1) }) { Text("Día →") }
+                    }
+                    Text("2. Ajusta la hora", fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = {
+                            val value = LocalTime.of(moveHour, moveMinute).minusMinutes(15)
+                            moveHour = value.hour; moveMinute = value.minute
+                        }) { Text("−15 min") }
+                        Text("%02d:%02d".format(moveHour, moveMinute), style = MaterialTheme.typography.titleLarge)
+                        TextButton(onClick = {
+                            val value = LocalTime.of(moveHour, moveMinute).plusMinutes(15)
+                            moveHour = value.hour; moveMinute = value.minute
+                        }) { Text("+15 min") }
+                    }
+                    Text("También puedes mantener pulsado y arrastrar el bloque.", color = MutedInk, fontSize = 12.sp)
+                }
+            },
+            dismissButton = { TextButton(onClick = { showMoveDialog = false }) { Text("Cancelar") } },
+            confirmButton = {
+                TextButton(onClick = {
+                    onReschedule(task.id, moveDate, moveHour, moveMinute)
+                    showMoveDialog = false
+                }) { Text("Confirmar", color = Coral, fontWeight = FontWeight.Bold) }
+            }
+        )
     }
 }
 

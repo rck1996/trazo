@@ -1,5 +1,16 @@
 # Cambios
 
+## 3.9.0 (en validación)
+
+- Tres diseños seleccionables para Hoy: Enfoque, Equilibrado y Panorama, con Equilibrado como valor compatible predeterminado.
+- Herramientas compactas después de las acciones inmediatas y onboarding adaptable de tres pasos.
+- Ajustes a pantalla completa con siete subsecciones y retorno a la sección seleccionada.
+- Editores progresivos: planificación rápida visible y opciones avanzadas bajo demanda.
+- Búsqueda y filtros con contador y limpieza en Tareas, Hábitos y Calendario.
+- Alternativa accesible al arrastre de agenda mediante «Mover», selección de día/hora y confirmación.
+- Pomodoro refinado para separar ilustración, contador y contexto de la sesión.
+- Nuevas preferencias persistentes compatibles con instalaciones anteriores y pruebas de valores predeterminados.
+
 ## 3.8.0
 
 - Calendario sin botón flotante superpuesto: la creación de tareas ahora aparece dentro del contexto del día.

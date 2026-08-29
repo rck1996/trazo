@@ -1,5 +1,16 @@
 # Validación de Trazo
 
+## Validación de la versión 3.9.0 — 29 de agosto de 2026
+
+- `testDebugUnitTest`: correcto, incluidos valores compatibles de la reestructuración.
+- `lintDebug`: correcto, sin errores.
+- `assembleDebug`: correcto; APK `artifacts/Trazo-3.9.0-debug.apk`.
+- `connectedDebugAndroidTest`: 4/4 recorridos correctos en Pixel API 35 (`emulator-5580`).
+- Inicio limpio comprobado: onboarding de tres pasos visible y omisión persistente.
+- Revisión visual a 1080 × 2400 de onboarding, Hoy Equilibrado y Ajustes por subsecciones.
+- Navegación instrumentada por Calendario, sus tres vistas, Enfoque y editor avanzado con dependencias.
+- SHA-256 del APK: `85B9C5CF65975ACF0D67D941641A40C052315D4328FC3F9D5ABA22E4D1FD0FD3`.
+
 Fecha: 11 de julio de 2026
 
 ## Entorno

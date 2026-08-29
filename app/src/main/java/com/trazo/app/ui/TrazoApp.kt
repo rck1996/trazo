@@ -114,6 +114,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.trazo.app.TrazoViewModel
 import com.trazo.app.TaskInput
 import com.trazo.app.HabitInput
@@ -149,6 +151,7 @@ import com.trazo.app.data.ReviewSummary
 import com.trazo.app.data.SmartCaptureParser
 import com.trazo.app.data.SmartCaptureResult
 import com.trazo.app.data.ThemePreference
+import com.trazo.app.data.TodayLayout
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -191,6 +194,7 @@ fun TrazoApp(
         NotificationCenter.createChannels(context)
     }
     val state by viewModel.state
+    val appSettings by viewModel.settings
     var section by remember { mutableStateOf(Section.TODAY) }
     LaunchedEffect(requestedSection) {
         Section.entries.firstOrNull { it.name == requestedSection }?.let { section = it }
@@ -294,6 +298,8 @@ fun TrazoApp(
             initialDate = taskComposerDate,
             categories = state.categories,
             templates = state.taskTemplates,
+            advancedInitially = appSettings.taskAdvancedExpanded,
+            onAdvancedChanged = { viewModel.updateSettings(appSettings.copy(taskAdvancedExpanded = it)) },
             onDismiss = { composer = null; editingTask = null },
             onSaveTemplate = viewModel::saveTaskTemplate,
             onSave = { input ->
@@ -307,6 +313,8 @@ fun TrazoApp(
         Composer.HABIT -> HabitComposer(
             habit = editingHabit,
             draft = habitDraft,
+            advancedInitially = appSettings.habitAdvancedExpanded,
+            onAdvancedChanged = { viewModel.updateSettings(appSettings.copy(habitAdvancedExpanded = it)) },
             onDismiss = { composer = null; editingHabit = null },
             onSave = { input ->
                 editingHabit?.let { viewModel.updateHabit(it.id, input) }
@@ -326,6 +334,46 @@ fun TrazoApp(
             confirmButton = { TextButton(onClick = viewModel::completeSuggestedParent) { Text("Completar tarea") } },
             dismissButton = { TextButton(onClick = viewModel::dismissParentCompletionSuggestion) { Text("Ahora no") } }
         )
+    }
+    if (!appSettings.onboardingCompleted) {
+        OnboardingDialog(
+            onFinish = { viewModel.updateSettings(appSettings.copy(onboardingCompleted = true, seenRestructureTour = true)) },
+            onSkip = { viewModel.updateSettings(appSettings.copy(onboardingCompleted = true)) }
+        )
+    }
+}
+
+@Composable
+private fun OnboardingDialog(onFinish: () -> Unit, onSkip: () -> Unit) {
+    var page by remember { mutableIntStateOf(0) }
+    val pages = listOf(
+        Triple("UN TRAZO A LA VEZ", "Organiza sin ruido", "Hoy reúne la siguiente acción, tus rituales y el tiempo de enfoque en un único lugar."),
+        Triple("CAPTURA NATURAL", "Escríbelo como lo dirías", "Trazo interpreta tareas y hábitos con días, horas y prioridades. También puedes dictarlos por voz."),
+        Triple("TU PROPIO RITMO", "Adapta la experiencia", "Elige un inicio Enfoque, Equilibrado o Panorama. Tus datos siguen siendo locales y privados.")
+    )
+    val current = pages[page]
+    Dialog(onDismissRequest = onSkip, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = Paper) {
+            Column(
+                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(28.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(current.first, color = Coral, fontWeight = FontWeight.Black, letterSpacing = 1.4.sp)
+                Text(current.second, style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(top = 8.dp))
+                Text(current.third, color = MutedInk, fontSize = 17.sp, modifier = Modifier.padding(top = 14.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 34.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    pages.indices.forEach { index ->
+                        Box(Modifier.weight(1f).height(5.dp).clip(CircleShape).background(if (index <= page) Coral else Ink.copy(alpha = .10f)))
+                    }
+                }
+                Button(
+                    onClick = { if (page == pages.lastIndex) onFinish() else page++ },
+                    modifier = Modifier.fillMaxWidth().padding(top = 28.dp).height(54.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) { Text(if (page == pages.lastIndex) "Entrar a mi estudio" else "Siguiente", color = Color.White) }
+                TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Omitir", color = MutedInk) }
+            }
+        }
     }
 }
 
@@ -443,11 +491,8 @@ private fun TodayScreen(
         item {
             ProgressNote(done, total)
             QuickActions({ showCapture = true }, onOpenPlanner, onOpenFocus)
-            FeatureHubCard(
-                onCalendar = onOpenPlanner,
-                onTaskTools = onAddTask,
-                onOrganize = onAddTask
-            )
+        }
+        if (appSettings.todayLayout == TodayLayout.OVERVIEW) item {
             val periodFocusMinutes = if (weeklyReview) viewModel.focusStats().weekMinutes else viewModel.focusStats().todayMinutes
             ReviewCard(
                 if (weeklyReview) ReviewInsights.weekly(tasks, habits, today, periodFocusMinutes)
@@ -457,6 +502,8 @@ private fun TodayScreen(
                 focusMinutes = periodFocusMinutes,
                 onOpenPlanner = onOpenPlanner
             )
+        }
+        item {
             if (appSettings.nightReviewEnabled && LocalTime.now().hour >= appSettings.nightReviewHour && pending.isNotEmpty()) {
                 NightReviewCard(
                     tasks = pending,
@@ -468,13 +515,31 @@ private fun TodayScreen(
             SectionTitle("Siguiente trazo", "solo lo que importa ahora")
         }
         if (pending.isEmpty()) item { EmptyNote("Tu lista respira", "Anota una tarea pequeña para empezar.", onAddTask, R.drawable.widget_ai_task) }
-        items(pending.take(4), key = { it.id }) { task ->
+        items(pending.take(if (appSettings.todayLayout == TodayLayout.FOCUS) 2 else 4), key = { it.id }) { task ->
             Box(Modifier.animateItem()) { TaskCard(task, onTaskToggle, null, onSubtaskToggle = onSubtaskToggle) }
         }
         item { SectionTitle("Rituales de hoy", "la constancia también cuenta") }
         if (dueHabits.isEmpty()) item { EmptyNote("Sin rituales hoy", "Crea uno que se sienta tuyo.", onAddHabit, R.drawable.widget_ai_ritual) }
         items(dueHabits, key = { it.id }) { habit ->
             Box(Modifier.animateItem()) { HabitCard(habit, onHabitToggle, null) }
+        }
+        item {
+            FeatureHubCard(
+                onCalendar = onOpenPlanner,
+                onTaskTools = onAddTask,
+                onOrganize = onAddTask
+            )
+        }
+        if (appSettings.todayLayout != TodayLayout.OVERVIEW) item {
+            val periodFocusMinutes = if (weeklyReview) viewModel.focusStats().weekMinutes else viewModel.focusStats().todayMinutes
+            ReviewCard(
+                if (weeklyReview) ReviewInsights.weekly(tasks, habits, today, periodFocusMinutes)
+                else ReviewInsights.daily(tasks, habits, today, periodFocusMinutes),
+                weeklyReview,
+                onTogglePeriod = { weeklyReview = !weeklyReview },
+                focusMinutes = periodFocusMinutes,
+                onOpenPlanner = onOpenPlanner
+            )
         }
     }
     if (showSettings) {
@@ -507,22 +572,32 @@ private fun FeatureHubCard(
     onTaskTools: () -> Unit,
     onOrganize: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
     Surface(
+        onClick = { expanded = !expanded },
         color = Sky.copy(alpha = .10f),
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 7.dp).fillMaxWidth().sketchBorder(Sky.copy(alpha = .42f))
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("HERRAMIENTAS", color = Leaf, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.2.sp)
-            Text("Todo lo nuevo, a la vista", color = Ink, fontWeight = FontWeight.Black, fontSize = 18.sp)
-            Text("Accede directamente sin depender de condiciones ocultas.", color = MutedInk, fontSize = 12.sp)
-            Row(Modifier.fillMaxWidth().padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FeatureShortcut("▦", "Calendario", "Día · semana · mes", onCalendar, Modifier.weight(1f))
-                FeatureShortcut("↳", "Subtareas", "Dependencias", onTaskTools, Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("HERRAMIENTAS", color = Leaf, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.2.sp)
+                    Text(if (expanded) "Elige dónde continuar" else "Calendario · organización · avisos", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
+                Text(if (expanded) "Cerrar ↑" else "Abrir ↓", color = Coral, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
-            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FeatureShortcut("✦", "Organizar", "Categorías · plantillas", onOrganize, Modifier.weight(1f))
-                FeatureShortcut("◉", "Alarmas", "Configurar por tarea", onTaskTools, Modifier.weight(1f))
+            AnimatedVisibility(expanded) {
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FeatureShortcut("▦", "Calendario", "Día · semana · mes", onCalendar, Modifier.weight(1f))
+                        FeatureShortcut("↳", "Subtareas", "Dependencias", onTaskTools, Modifier.weight(1f))
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FeatureShortcut("✦", "Organizar", "Categorías · plantillas", onOrganize, Modifier.weight(1f))
+                        FeatureShortcut("◉", "Alarmas", "Configurar por tarea", onTaskTools, Modifier.weight(1f))
+                    }
+                }
             }
         }
     }
@@ -755,6 +830,11 @@ private fun CaptureSheet(
     }
 }
 
+private enum class SettingsSection(val label: String) {
+    NOTICES("Avisos"), APPEARANCE("Apariencia"), ORGANIZATION("Organización"), DATA("Datos"),
+    STATS("Estadísticas"), ARCHIVE("Archivados"), TRASH("Papelera")
+}
+
 @Composable
 private fun SettingsSheet(
     onDismiss: () -> Unit,
@@ -762,8 +842,8 @@ private fun SettingsSheet(
     onImport: () -> Unit,
     viewModel: TrazoViewModel
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var newCategoryName by remember { mutableStateOf("") }
+    var section by remember { mutableStateOf(SettingsSection.NOTICES) }
     val state by viewModel.state
     val settings by viewModel.settings
     val stats = viewModel.focusStats()
@@ -778,19 +858,40 @@ private fun SettingsSheet(
     val archivedHabits = state.habits.filter { it.archived && it.deletedAt == null }
     val deletedTasks = state.tasks.filter { it.deletedAt != null }
     val deletedHabits = state.habits.filter { it.deletedAt != null }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper, sheetState = sheetState) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = Paper) {
         Column(
-            Modifier.fillMaxWidth().fillMaxHeight(.94f).verticalScroll(rememberScrollState())
-                .navigationBarsPadding().padding(bottom = 72.dp)
+            Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())
+                .navigationBarsPadding().padding(bottom = 48.dp)
         ) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
-                Text("Ajustes", style = MaterialTheme.typography.headlineMedium)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Ajustes", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onDismiss) { Text("Cerrar", color = Coral) }
+                }
                 Text(
                     "Personaliza tu experiencia, revisa tu avance y cuida tus datos.",
                     color = MutedInk,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                SettingsSection.entries.forEach { item ->
+                    val selected = section == item
+                    Surface(
+                        onClick = { section = item },
+                        color = if (selected) Ink else PaperRaised,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.semantics { contentDescription = "${item.label}, ${if (selected) "seleccionado" else "no seleccionado"}" }
+                    ) {
+                        Text(item.label, color = if (selected) Paper else MutedInk, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp))
+                    }
+                }
+            }
+            if (section == SettingsSection.NOTICES) {
             Text(
                 "NOTIFICACIONES",
                 color = Coral,
@@ -800,6 +901,8 @@ private fun SettingsSheet(
                 modifier = Modifier.padding(start = 24.dp, top = 8.dp)
             )
             ReminderCard(state)
+            }
+            if (section == SettingsSection.APPEARANCE) {
             Text("APARIENCIA Y ACCESIBILIDAD", color = Lavender, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Lavender.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
@@ -812,12 +915,31 @@ private fun SettingsSheet(
                             }
                         }
                     }
+                    Text("Diseño de Hoy", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TodayLayout.entries.forEach { layout ->
+                            val selected = settings.todayLayout == layout
+                            TextButton(
+                                onClick = { viewModel.updateSettings(settings.copy(todayLayout = layout)) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    when (layout) { TodayLayout.FOCUS -> "Enfoque"; TodayLayout.BALANCED -> "Equilibrado"; TodayLayout.OVERVIEW -> "Panorama" },
+                                    color = if (selected) Coral else MutedInk,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
                     SettingsToggle("Texto más grande", settings.largeText) { viewModel.updateSettings(settings.copy(largeText = it)) }
                     SettingsToggle("Minimalista blanco y negro", settings.minimalMode) { viewModel.updateSettings(settings.copy(minimalMode = it)) }
                     SettingsToggle("Reducir animaciones", settings.reducedMotion) { viewModel.updateSettings(settings.copy(reducedMotion = it)) }
                     SettingsToggle("Respuesta háptica", settings.haptics) { viewModel.updateSettings(settings.copy(haptics = it)) }
                 }
             }
+            }
+            if (section == SettingsSection.ORGANIZATION) {
             Text("ORGANIZACIÓN", color = Leaf, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Leaf.copy(alpha = .09f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
@@ -863,6 +985,8 @@ private fun SettingsSheet(
                     Text("Aparece en Hoy para completar, pasar a mañana o archivar pendientes.", color = MutedInk, fontSize = 11.sp)
                 }
             }
+            }
+            if (section == SettingsSection.STATS) {
             Text("ESTADÍSTICAS · ÚLTIMOS 7 DÍAS", color = Mustard, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Mustard.copy(alpha = .12f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceAround) {
@@ -883,6 +1007,8 @@ private fun SettingsSheet(
                     )
                 }
             }
+            }
+            if (section == SettingsSection.ARCHIVE) {
             Text("ARCHIVADAS · ${archivedTasks.size + archivedHabits.size}", color = Sky, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
@@ -893,6 +1019,8 @@ private fun SettingsSheet(
                     }
                 }
             }
+            }
+            if (section == SettingsSection.TRASH) {
             Text("PAPELERA · ${deletedTasks.size + deletedHabits.size}", color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 8.dp))
             Surface(color = Coral.copy(alpha = .08f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
@@ -907,6 +1035,8 @@ private fun SettingsSheet(
                     }
                 }
             }
+            }
+            if (section == SettingsSection.DATA) {
             Text(
                 "DATOS LOCALES",
                 color = Leaf,
@@ -916,6 +1046,8 @@ private fun SettingsSheet(
                 modifier = Modifier.padding(start = 24.dp, top = 12.dp)
             )
             LocalDataCard(onExport, onImport)
+            }
+        }
         }
     }
 }
@@ -1317,6 +1449,12 @@ private fun TasksScreen(
 @Composable
 private fun TaskFilters(selected: TaskFilterSelection, onSelect: (TaskFilterSelection) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
+        val defaults = TaskFilterSelection()
+        val activeCount = listOf(selected.status != defaults.status, selected.date != defaults.date, selected.priority != defaults.priority).count { it }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (activeCount == 0) "Filtros" else "$activeCount filtros activos", color = MutedInk, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            if (activeCount > 0) TextButton(onClick = { onSelect(defaults) }) { Text("Limpiar", color = Coral, fontSize = 12.sp) }
+        }
         FilterRow(
             options = TaskStatusFilter.entries.toList(),
             selected = selected.status,
@@ -1381,15 +1519,43 @@ private fun HabitsScreen(
     onArchive: (String) -> Unit, onAdjust: (String, Int) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    val visible = habits.filter { query.isBlank() || it.title.contains(query, true) || it.category.label.contains(query, true) || it.tags.any { tag -> tag.contains(query, true) } }
+    var categoryFilter by remember { mutableStateOf<String?>(null) }
+    var todayOnly by remember { mutableStateOf(false) }
+    val today = LocalDate.now()
+    val categories = habits.map { it.category.label }.distinct().sorted()
+    val activeFilters = (if (categoryFilter != null) 1 else 0) + (if (todayOnly) 1 else 0)
+    val visible = habits.filter {
+        (query.isBlank() || it.title.contains(query, true) || it.category.label.contains(query, true) || it.tags.any { tag -> tag.contains(query, true) }) &&
+            (categoryFilter == null || it.category.label == categoryFilter) &&
+            (!todayOnly || HabitProgress.isScheduled(it, today))
+    }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
         item { PageHeader("Pequeños trazos", "Tus hábitos", "No busques perfección; vuelve mañana.") }
         item { SearchField(query, { query = it }, "Buscar hábitos o #etiquetas") }
+        item {
+            Column(Modifier.fillMaxWidth().padding(bottom = 5.dp)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (activeFilters == 0) "Filtros" else "$activeFilters filtros activos", color = MutedInk, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    if (activeFilters > 0) TextButton(onClick = { categoryFilter = null; todayOnly = false }) { Text("Limpiar", color = Coral, fontSize = 12.sp) }
+                }
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChipLabel("Programados hoy", todayOnly) { todayOnly = !todayOnly }
+                    categories.forEach { category -> FilterChipLabel(category, categoryFilter == category) { categoryFilter = category.takeUnless { it == categoryFilter } } }
+                }
+            }
+        }
         if (visible.isNotEmpty()) item { HabitSummary(visible) }
         if (visible.isEmpty()) item { EmptyNote("Aún sin rituales", "Agrega un hábito amable y sostenible.", null, R.drawable.widget_ai_ritual) }
         items(visible, key = { it.id }) {
             Box(Modifier.animateItem()) { HabitCard(it, onToggle, onDelete, { onEdit(it) }, { delta -> onAdjust(it.id, delta) }, { onArchive(it.id) }) }
         }
+    }
+}
+
+@Composable
+private fun FilterChipLabel(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, color = if (selected) Ink else PaperRaised, shape = RoundedCornerShape(14.dp)) {
+        Text(label, color = if (selected) Paper else MutedInk, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp))
     }
 }
 
@@ -1852,6 +2018,7 @@ private fun SketchNavigation(selected: Section, onSelect: (Section) -> Unit) {
 private fun TaskComposer(
     task: Task?, draft: TaskInput?, initialDate: LocalDate?,
     categories: List<CategoryDefinition>, templates: List<TaskTemplate>,
+    advancedInitially: Boolean, onAdvancedChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit, onSaveTemplate: (String, TaskInput) -> Unit,
     onSave: (TaskInput) -> Unit
 ) {
@@ -1873,6 +2040,7 @@ private fun TaskComposer(
     var reminderText by remember(task, draft) { mutableStateOf((task?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, task?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
     var tags by remember(task, draft) { mutableStateOf((task?.tags ?: draft?.tags.orEmpty()).joinToString(", ")) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var advanced by remember(task) { mutableStateOf(task != null || advancedInitially) }
     val focusManager = LocalFocusManager.current
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper, sheetState = sheetState) {
         ComposerLayout(if (task == null) "Nueva tarea" else "Editar tarea", if (task == null) "Sácala de tu cabeza y déjala aquí." else "Ajusta lo que necesites.") {
@@ -1903,6 +2071,26 @@ private fun TaskComposer(
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
+            Surface(color = Leaf.copy(alpha = .08f), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Plan rápido", color = Leaf, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf(15, 25, 45, 60).forEach { minutes ->
+                            TimeChoice(if (minutes == 60) "1 h" else "$minutes min", durationMinutes == minutes) { durationMinutes = minutes }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        DateChoice("Sin fecha", dueDate == null) { dueDate = null }
+                        DateChoice("Hoy", dueDate == LocalDate.now()) { dueDate = LocalDate.now() }
+                        DateChoice("Mañana", dueDate == LocalDate.now().plusDays(1)) { dueDate = LocalDate.now().plusDays(1) }
+                    }
+                }
+            }
+            TextButton(onClick = { advanced = !advanced; onAdvancedChanged(advanced) }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (advanced) "Ocultar opciones avanzadas ↑" else "Más opciones ↓", color = Coral, fontWeight = FontWeight.Bold)
+            }
+            AnimatedVisibility(advanced) {
+            Column {
             Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = note, onValueChange = { note = it }, label = { Text("Una nota (opcional)") },
@@ -2050,6 +2238,8 @@ private fun TaskComposer(
                         reminderHour, reminderMinute, reminderMode, criticalAlarm, parseTags(tags)))
                 }, modifier = Modifier.fillMaxWidth()) { Text("Guardar configuración como plantilla", color = Leaf) }
             }
+            }
+            }
             SaveButton(if (task == null) "Guardar tarea" else "Guardar cambios", title.isNotBlank()) {
                 onSave(TaskInput(title = title, note = note, important = important, dueDate = dueDate,
                     durationMinutes = durationMinutes, recurrence = recurrence, categoryId = categoryId, reminderHour = reminderHour,
@@ -2152,10 +2342,13 @@ private fun RowScope.DateChoice(label: String, selected: Boolean, onClick: () ->
 private fun HabitComposer(
     habit: Habit?,
     draft: HabitInput?,
+    advancedInitially: Boolean,
+    onAdvancedChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onSave: (HabitInput) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var advanced by remember(habit) { mutableStateOf(habit != null || advancedInitially) }
     var title by remember(habit, draft) { mutableStateOf(habit?.title ?: draft?.title.orEmpty()) }
     var emoji by remember(habit, draft) { mutableStateOf(habit?.emoji ?: draft?.emoji ?: "✦") }
     var category by remember(habit, draft) { mutableStateOf(habit?.category ?: draft?.category ?: HabitCategory.GENERAL) }
@@ -2235,6 +2428,15 @@ private fun HabitComposer(
                     ) { Text(labels.getValue(day), color = if (active) Color.White else Ink, fontWeight = FontWeight.Bold) }
                 }
             }
+            if (days.isEmpty()) Text("Elige al menos un día", color = Coral, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            TextButton(
+                onClick = { advanced = !advanced; onAdvancedChanged(advanced) },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            ) {
+                Text(if (advanced) "Ocultar opciones avanzadas ↑" else "Más opciones ↓", color = Leaf, fontWeight = FontWeight.Bold)
+            }
+            AnimatedVisibility(advanced) {
+                Column {
             Text("Frecuencia", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 7.dp))
             Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -2283,6 +2485,8 @@ private fun HabitComposer(
                 SettingsToggle("Alarma crítica · pantalla completa", criticalAlarm) { criticalAlarm = it }
             }
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                }
+            }
             Spacer(Modifier.height(22.dp))
             SaveButton(if (habit == null) "Crear hábito" else "Guardar cambios", title.isNotBlank() && days.isNotEmpty()) {
                 onSave(HabitInput(

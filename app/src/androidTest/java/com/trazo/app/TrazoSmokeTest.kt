@@ -3,10 +3,13 @@ package com.trazo.app
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -15,6 +18,14 @@ import org.junit.runner.RunWith
 class TrazoSmokeTest {
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
+
+    @Before
+    fun dismissOnboardingWhenNeeded() {
+        rule.waitForIdle()
+        if (rule.onAllNodesWithText("Omitir").fetchSemanticsNodes().isNotEmpty()) {
+            rule.onNodeWithText("Omitir").performClick()
+        }
+    }
 
     @Test
     fun opensFocusFromToday() {
@@ -25,8 +36,7 @@ class TrazoSmokeTest {
 
     @Test
     fun calendarAndItsThreeViewsAreDiscoverable() {
-        rule.onNodeWithText("Todo lo nuevo, a la vista").assertIsDisplayed()
-        rule.onNodeWithText("Día · semana · mes").performClick()
+        rule.onNodeWithText("Calendario").performClick()
         rule.onNodeWithText("AGENDA VIVA").assertIsDisplayed()
         rule.onNodeWithText("Agenda diaria").assertIsDisplayed()
         rule.onNodeWithText("Semana").assertIsDisplayed()
@@ -35,7 +45,7 @@ class TrazoSmokeTest {
 
     @Test
     fun monthShowsLoadMapAndSelectedDaySummary() {
-        rule.onNodeWithText("Día · semana · mes").performClick()
+        rule.onNodeWithText("Calendario").performClick()
         rule.onNodeWithText("Mes").performClick()
         rule.onNodeWithText("CARGA POR TIEMPO").assertIsDisplayed()
         rule.onNodeWithText("Abrir →").assertIsDisplayed()
@@ -44,9 +54,11 @@ class TrazoSmokeTest {
 
     @Test
     fun subtaskDependenciesAreEditableFromToday() {
-        rule.onNodeWithText("Dependencias").performClick()
+        rule.onNodeWithText("Tareas").performClick()
+        rule.onNodeWithContentDescription("Crear elemento").performClick()
         rule.onNodeWithText("Nueva tarea").assertIsDisplayed()
         rule.onNodeWithText("¿Qué quieres hacer?").performTextInput("Preparar informe")
+        rule.onNodeWithText("Más opciones ↓").performClick()
         rule.onNodeWithText("Subtareas (una por línea)")
             .performTextInput("Buscar datos\nRedactar resumen")
         rule.onNodeWithText("↳ Sin dependencia").assertExists()

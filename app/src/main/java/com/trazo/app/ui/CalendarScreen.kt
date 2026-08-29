@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -218,7 +219,7 @@ private fun DayAgenda(
         if (timedTasks.isNotEmpty()) {
             item { TimedAgendaHeader(timedTasks.size) }
             items(timedTasks, key = { "timed-${it.id}" }) { task ->
-                TimedTaskBlock(task, date, onTaskToggle, onSubtaskToggle, onTaskReschedule)
+                TimedTaskBlock(task, date, onTaskToggle, onTaskReschedule)
             }
             if (untimedTasks.isNotEmpty()) item { AgendaSubLabel("Sin hora asignada") }
         }
@@ -253,7 +254,6 @@ private fun TimedTaskBlock(
     task: Task,
     date: LocalDate,
     onToggle: (String) -> Unit,
-    onSubtaskToggle: (String, String) -> Unit,
     onReschedule: (String, LocalDate, Int, Int) -> Unit
 ) {
     val hour = task.reminderHour ?: return
@@ -297,17 +297,18 @@ private fun TimedTaskBlock(
             },
         verticalAlignment = Alignment.Top
     ) {
-        Column(Modifier.width(58.dp).padding(top = 13.dp)) {
+        Column(Modifier.width(64.dp).padding(top = 13.dp)) {
             val shownStart = if (dragging) previewStart else start
             val shownEnd = if (dragging) previewEnd else end
             Text(shownStart.format(DateTimeFormatter.ofPattern("HH:mm")), color = Coral, fontWeight = FontWeight.Bold)
+            Text("hasta", color = MutedInk, fontSize = 9.sp)
             Text(shownEnd.format(DateTimeFormatter.ofPattern("HH:mm")), color = MutedInk, fontSize = 11.sp)
         }
         Column(Modifier.weight(1f)) {
             Surface(
                 color = if (dragging) Mustard.copy(alpha = .26f) else PaperRaised,
                 shape = RoundedCornerShape(13.dp),
-                modifier = Modifier.fillMaxWidth().height(plannerBlockHeightDp(task.durationMinutes).dp)
+                modifier = Modifier.fillMaxWidth().heightIn(min = maxOf(plannerBlockHeightDp(task.durationMinutes), 156).dp)
             ) {
                 Column(Modifier.padding(10.dp)) {
                     Row(Modifier.clickable { onToggle(task.id) }, verticalAlignment = Alignment.CenterVertically) {
@@ -325,7 +326,7 @@ private fun TimedTaskBlock(
                             )
                         }
                     }
-                    TaskChecklist(task, onSubtaskToggle, compact = true)
+                    TimedTaskProgress(task)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = {
                             val earlier = start.minusMinutes(15)
@@ -341,6 +342,29 @@ private fun TimedTaskBlock(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TimedTaskProgress(task: Task) {
+    if (task.subtasks.isEmpty()) return
+    val completed = task.subtasks.count { it.completed }
+    val firstPending = task.subtasks.firstOrNull { !it.completed }
+    Column(Modifier.fillMaxWidth().padding(start = 48.dp, top = 3.dp, end = 4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("$completed / ${task.subtasks.size} pasos", color = if (completed == task.subtasks.size) Leaf else MutedInk, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            if (firstPending != null) Text("Siguiente", color = Coral, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        }
+        if (firstPending != null) {
+            val dependency = firstPending.dependsOnId?.let { id -> task.subtasks.firstOrNull { it.id == id } }
+            Text(
+                if (dependency != null && !dependency.completed) "🔒 ${firstPending.title} · espera «${dependency.title}»" else "→ ${firstPending.title}",
+                color = if (dependency != null && !dependency.completed) Coral else Ink,
+                fontSize = 11.sp,
+                maxLines = 1
+            )
         }
     }
 }

@@ -1,5 +1,12 @@
 # Cambios
 
+## 3.6.3
+
+- Corrección responsive de los bloques horarios cortos en Agenda diaria.
+- Rango horario legible con «inicio · hasta · fin», sin confundir la hora final con otra cita.
+- Checklist compacto con progreso, siguiente paso y dependencia bloqueante, sin controles deformados.
+- Altura mínima segura para conservar acciones de reprogramación incluso en tareas de 15 o 25 minutos.
+
 ## 3.6.2
 
 - Nuevo centro de herramientas visible en Hoy con accesos directos a calendario, dependencias, categorías, plantillas y alarmas.

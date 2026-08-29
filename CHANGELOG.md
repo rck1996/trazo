@@ -1,5 +1,13 @@
 # Cambios
 
+## 3.6.2
+
+- Nuevo centro de herramientas visible en Hoy con accesos directos a calendario, dependencias, categorías, plantillas y alarmas.
+- La navegación ahora usa el nombre «Calendario» y expone claramente Agenda diaria, Semana y Mes.
+- Cada vista del calendario explica qué muestra y cómo usar sus interacciones.
+- El editor explica desde el inicio cómo crear plantillas y cuándo aparecen las dependencias.
+- Pruebas instrumentadas específicas para descubrir el calendario y configurar dependencias desde Hoy.
+
 ## 3.6.1
 
 - Editor visual de dependencias entre subtareas: cada paso puede depender de cualquiera de los pasos anteriores.

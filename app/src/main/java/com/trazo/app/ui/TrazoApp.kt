@@ -155,7 +155,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private enum class Section(val label: String, val icon: TrazoIconKind) {
-    TODAY("Hoy", TrazoIconKind.TODAY), TASKS("Tareas", TrazoIconKind.TASK), CALENDAR("Planner", TrazoIconKind.CALENDAR),
+    TODAY("Hoy", TrazoIconKind.TODAY), TASKS("Tareas", TrazoIconKind.TASK), CALENDAR("Calendario", TrazoIconKind.CALENDAR),
     HABITS("Hábitos", TrazoIconKind.HABIT), FOCUS("Enfoque", TrazoIconKind.FOCUS)
 }
 
@@ -439,6 +439,11 @@ private fun TodayScreen(
         item {
             ProgressNote(done, total)
             QuickActions({ showCapture = true }, onOpenPlanner, onOpenFocus)
+            FeatureHubCard(
+                onCalendar = onOpenPlanner,
+                onTaskTools = onAddTask,
+                onOrganize = onAddTask
+            )
             val periodFocusMinutes = if (weeklyReview) viewModel.focusStats().weekMinutes else viewModel.focusStats().todayMinutes
             ReviewCard(
                 if (weeklyReview) ReviewInsights.weekly(tasks, habits, today, periodFocusMinutes)
@@ -489,6 +494,45 @@ private fun TodayScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun FeatureHubCard(
+    onCalendar: () -> Unit,
+    onTaskTools: () -> Unit,
+    onOrganize: () -> Unit
+) {
+    Surface(
+        color = Sky.copy(alpha = .10f),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 7.dp).fillMaxWidth().sketchBorder(Sky.copy(alpha = .42f))
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("HERRAMIENTAS", color = Leaf, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.2.sp)
+            Text("Todo lo nuevo, a la vista", color = Ink, fontWeight = FontWeight.Black, fontSize = 18.sp)
+            Text("Accede directamente sin depender de condiciones ocultas.", color = MutedInk, fontSize = 12.sp)
+            Row(Modifier.fillMaxWidth().padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FeatureShortcut("▦", "Calendario", "Día · semana · mes", onCalendar, Modifier.weight(1f))
+                FeatureShortcut("↳", "Subtareas", "Dependencias", onTaskTools, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FeatureShortcut("✦", "Organizar", "Categorías · plantillas", onOrganize, Modifier.weight(1f))
+                FeatureShortcut("◉", "Alarmas", "Configurar por tarea", onTaskTools, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeatureShortcut(
+    symbol: String, title: String, subtitle: String, onClick: () -> Unit, modifier: Modifier = Modifier
+) {
+    Surface(onClick = onClick, color = Paper.copy(alpha = .82f), shape = RoundedCornerShape(12.dp), modifier = modifier) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 9.dp)) {
+            Text("$symbol  $title", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(subtitle, color = MutedInk, fontSize = 10.sp, maxLines = 1)
+        }
     }
 }
 
@@ -1825,9 +1869,11 @@ private fun TaskComposer(
     val focusManager = LocalFocusManager.current
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper) {
         ComposerLayout(if (task == null) "Nueva tarea" else "Editar tarea", if (task == null) "Sácala de tu cabeza y déjala aquí." else "Ajusta lo que necesites.") {
-            if (task == null && templates.isNotEmpty()) {
+            if (task == null) {
                 Text("Plantillas", color = MutedInk, fontSize = 12.sp)
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (templates.isEmpty()) {
+                    Text("Aún no hay plantillas. Completa esta tarea y usa «Guardar configuración como plantilla».", color = MutedInk, fontSize = 10.sp, modifier = Modifier.padding(vertical = 5.dp))
+                } else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     templates.forEach { template ->
                         Surface(onClick = {
                             title = template.title; note = template.note
@@ -1857,6 +1903,7 @@ private fun TaskComposer(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                 )
+                if (subtasks.size < 2) Text("Añade al menos dos subtareas para configurar dependencias.", color = MutedInk, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                 Text("Categoría", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     categories.forEach { category ->

@@ -62,7 +62,7 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private enum class CalendarMode(val label: String) { DAY("Día"), PLANNER("Planner"), MONTH("Mes") }
+private enum class CalendarMode(val label: String) { DAY("Agenda diaria"), PLANNER("Semana"), MONTH("Mes") }
 private val EsLocale = Locale.forLanguageTag("es-CL")
 
 @Composable
@@ -97,6 +97,7 @@ internal fun CalendarScreen(
             }
         )
         ModeSelector(mode) { mode = it }
+        CalendarGuide(mode)
         AnimatedContent(
             targetState = mode,
             transitionSpec = {
@@ -117,6 +118,25 @@ internal fun CalendarScreen(
                     mode = CalendarMode.DAY
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CalendarGuide(mode: CalendarMode) {
+    val message = when (mode) {
+        CalendarMode.DAY -> "Bloques por hora. Mantén pulsada una tarea y arrástrala para cambiar día u hora."
+        CalendarMode.PLANNER -> "Tu semana completa. Toca un día para abrir su agenda horaria."
+        CalendarMode.MONTH -> "Calendario mensual. Toca una fecha para ver tareas, hábitos y horas."
+    }
+    Surface(
+        color = Sky.copy(alpha = .11f),
+        shape = RoundedCornerShape(13.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).fillMaxWidth()
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            TrazoIcon(TrazoIconKind.CALENDAR, color = Coral, size = 18.dp)
+            Text(message, color = MutedInk, fontSize = 11.sp, modifier = Modifier.padding(start = 9.dp))
         }
     }
 }

@@ -14,6 +14,7 @@ import com.trazo.app.R
 import com.trazo.app.data.LocalStore
 import com.trazo.app.model.Habit
 import com.trazo.app.model.HabitProgress
+import com.trazo.app.model.ItemReminderMode
 import com.trazo.app.model.Task
 import com.trazo.app.model.TrazoState
 import java.time.LocalDate
@@ -54,7 +55,7 @@ object ItemReminderScheduler {
         val now = LocalDateTime.now()
         if (settings.taskReminders) state.tasks.filter(Task::hasActiveReminder).forEach { task ->
             val eventAt = LocalDateTime.of(task.dueDate, LocalTime.of(task.reminderHour!!, task.reminderMinute))
-            viableDeliveries(context, "task", task.id, eventAt, settings, now).forEach { delivery ->
+            viableDeliveries(context, "task", task.id, eventAt, effectiveDeliveryMode(task.reminderMode, settings), settings, now).forEach { delivery ->
                 schedule(context, "task", task.id, eventAt, delivery, now)
                 scheduled += token("task", task.id, delivery.stage)
             }
@@ -66,7 +67,7 @@ object ItemReminderScheduler {
             repeat(15) {
                 if (habit.hasActiveReminderOn(date)) {
                     val eventAt = LocalDateTime.of(date, LocalTime.of(habit.reminderHour!!, habit.reminderMinute))
-                    val deliveries = viableDeliveries(context, "habit", habit.id, eventAt, settings, now)
+                    val deliveries = viableDeliveries(context, "habit", habit.id, eventAt, effectiveDeliveryMode(habit.reminderMode, settings), settings, now)
                     if (deliveries.isNotEmpty()) {
                         deliveries.forEach { delivery ->
                             schedule(context, "habit", habit.id, eventAt, delivery, now)
@@ -105,10 +106,11 @@ object ItemReminderScheduler {
         kind: String,
         id: String,
         eventAt: LocalDateTime,
+        deliveryMode: ReminderDeliveryMode,
         settings: ReminderSettings,
         now: LocalDateTime
     ): List<AlarmNotificationPolicy.Delivery> {
-        val deliveries = AlarmNotificationPolicy.deliveries(eventAt, settings.deliveryMode, settings.earlyMinutes)
+        val deliveries = AlarmNotificationPolicy.deliveries(eventAt, deliveryMode, settings.earlyMinutes)
             .filterNot { ReminderDeliveryStore.wasDelivered(context, deliveryKey(kind, id, it.at, it.stage)) }
         val future = deliveries.filter { it.at.isAfter(now) }
         val recovered = if (settings.recoverMissed) {
@@ -138,6 +140,10 @@ object ItemReminderScheduler {
     }
 
     internal fun notificationId(id: String) = 7400 + id.hashCode().and(0x3fff)
+
+    /** A per-item choice wins; null retains the app-wide preference for old items. */
+    internal fun effectiveDeliveryMode(override: ItemReminderMode?, settings: ReminderSettings): ReminderDeliveryMode =
+        override?.let { ReminderDeliveryMode.valueOf(it.name) } ?: settings.deliveryMode
 
     fun snooze(context: Context, kind: String, id: String, minutes: Int, eventAtMillis: Long) {
         val trigger = LocalDateTime.now().plusMinutes(minutes.coerceIn(1, 180).toLong())
@@ -307,10 +313,15 @@ class ItemReminderReceiver : BroadcastReceiver() {
                 return
             }
         }
+        val itemMode = when (item) {
+            is Task -> ItemReminderScheduler.effectiveDeliveryMode(item.reminderMode, settings)
+            is Habit -> ItemReminderScheduler.effectiveDeliveryMode(item.reminderMode, settings)
+            else -> settings.deliveryMode
+        }
         val alarmMode = when (stage) {
             "early" -> true
-            "snooze" -> settings.deliveryMode.usesAlarm
-            else -> settings.deliveryMode.usesAlarm
+            "snooze" -> itemMode.usesAlarm
+            else -> itemMode.usesAlarm
         }
         val heading = when (stage) {
             "early" -> "Alarma previa · faltan ${settings.earlyMinutes} min"

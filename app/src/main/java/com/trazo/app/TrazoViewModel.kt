@@ -13,6 +13,7 @@ import com.trazo.app.model.Habit
 import com.trazo.app.model.HabitCategory
 import com.trazo.app.model.HabitProgress
 import com.trazo.app.model.HabitUnit
+import com.trazo.app.model.ItemReminderMode
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
 import com.trazo.app.model.TaskRecurrence
@@ -31,6 +32,7 @@ data class TaskInput(
     val subtasks: List<TaskSubtask> = emptyList(),
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
+    val reminderMode: ItemReminderMode? = null,
     val tags: Set<String> = emptySet()
 )
 
@@ -45,6 +47,7 @@ data class HabitInput(
     val unit: HabitUnit = HabitUnit.CHECK,
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
+    val reminderMode: ItemReminderMode? = null,
     val tags: Set<String> = emptySet()
 )
 
@@ -81,6 +84,7 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
             subtasks = input.subtasks,
             reminderHour = input.reminderHour.takeIf { input.dueDate != null },
             reminderMinute = input.reminderMinute,
+            reminderMode = input.reminderMode,
             tags = input.tags.cleanTags()
         )) + state.tasks) }
     }
@@ -103,6 +107,17 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
             task.copy(id = java.util.UUID.randomUUID().toString(), completed = false, completedAt = null, dueDate = nextDate, createdOn = LocalDate.now())
         }
         state.copy(tasks = updatedTasks + listOfNotNull(nextTask))
+    }
+
+    /** Marks one checklist entry without changing the completion state of its parent task. */
+    fun toggleTaskSubtask(taskId: String, subtaskId: String) = update { state ->
+        state.copy(tasks = state.tasks.map { task ->
+            if (task.id != taskId) task else task.copy(
+                subtasks = task.subtasks.map { subtask ->
+                    if (subtask.id == subtaskId) subtask.copy(completed = !subtask.completed) else subtask
+                }
+            )
+        })
     }
 
     fun deleteTask(id: String) {
@@ -130,6 +145,7 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
                 subtasks = input.subtasks,
                 reminderHour = input.reminderHour.takeIf { input.dueDate != null },
                 reminderMinute = input.reminderMinute,
+                reminderMode = input.reminderMode,
                 tags = input.tags.cleanTags()
             ) else it
         }) }
@@ -144,6 +160,7 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
             skippedDates = input.skippedDates,
             target = input.target.coerceAtLeast(1), unit = input.unit,
             reminderHour = input.reminderHour, reminderMinute = input.reminderMinute,
+            reminderMode = input.reminderMode,
             tags = input.tags.cleanTags()
         )) }
     }
@@ -189,6 +206,7 @@ class TrazoViewModel(application: Application) : AndroidViewModel(application) {
                 skippedDates = input.skippedDates,
                 target = input.target.coerceAtLeast(1), unit = input.unit,
                 reminderHour = input.reminderHour, reminderMinute = input.reminderMinute,
+                reminderMode = input.reminderMode,
                 tags = input.tags.cleanTags()
             ) else it
         }) }

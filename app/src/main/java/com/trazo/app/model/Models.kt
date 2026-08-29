@@ -7,6 +7,18 @@ import java.util.UUID
 enum class TaskPriority { CALM, IMPORTANT }
 enum class TaskRecurrence { NONE, DAILY, WEEKLY, MONTHLY }
 
+/**
+ * Optional delivery override for one task or habit. A null value deliberately
+ * means "use the notification preference configured for the whole app" so
+ * backups created before per-item delivery modes remain unchanged.
+ */
+enum class ItemReminderMode {
+    NOTIFICATION,
+    EARLY_ALARM,
+    ON_TIME_ALARM,
+    BOTH_ALARMS
+}
+
 enum class HabitCategory(val label: String, val symbol: String) {
     GENERAL("General", "✦"),
     HYDRATION("Hidratación", "💧"),
@@ -54,6 +66,7 @@ data class Task(
     val subtasks: List<TaskSubtask> = emptyList(),
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
+    val reminderMode: ItemReminderMode? = null,
     val tags: Set<String> = emptySet(),
     val archived: Boolean = false,
     val deletedAt: Long? = null
@@ -79,6 +92,7 @@ data class Habit(
     val unit: HabitUnit = HabitUnit.CHECK,
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
+    val reminderMode: ItemReminderMode? = null,
     val tags: Set<String> = emptySet(),
     val archived: Boolean = false,
     val deletedAt: Long? = null,

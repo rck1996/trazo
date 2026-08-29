@@ -138,4 +138,41 @@ class SmartCaptureParserTest {
         assertEquals(LocalDate.of(2026, 8, 20), result.input.dueDate)
         assertTrue(result.input.important)
     }
+
+    @Test fun parsesDetailedTaskEffortRelativeDateAndWordClock() {
+        val result = SmartCaptureParser.parse(
+            "Tarea estudiar inglés 1 hora y 30 minutos en dos días a las siete y media de la tarde #estudio",
+            today
+        ) as SmartCaptureResult.TaskDraft
+        assertEquals("estudiar inglés", result.input.title)
+        assertEquals(today.plusDays(2), result.input.dueDate)
+        assertEquals(90, result.input.durationMinutes)
+        assertEquals(19, result.input.reminderHour)
+        assertEquals(30, result.input.reminderMinute)
+        assertEquals(setOf("estudio"), result.input.tags)
+    }
+
+    @Test fun doesNotTurnTimedOneOffTaskIntoHabit() {
+        val result = SmartCaptureParser.parse("Estudiar inglés 45 minutos mañana", today)
+            as SmartCaptureResult.TaskDraft
+        assertEquals("Estudiar inglés", result.input.title)
+        assertEquals(today.plusDays(1), result.input.dueDate)
+        assertEquals(45, result.input.durationMinutes)
+    }
+
+    @Test fun parsesTaskWeeklyRecurrenceOnNamedWeekday() {
+        val result = SmartCaptureParser.parse("Tarea revisar presupuesto todos los lunes", today)
+            as SmartCaptureResult.TaskDraft
+        assertEquals("revisar presupuesto", result.input.title)
+        assertEquals(TaskRecurrence.WEEKLY, result.input.recurrence)
+        assertEquals(LocalDate.of(2026, 8, 17), result.input.dueDate)
+    }
+
+    @Test fun parsesSpinningWeekdaysAndClockTogether() {
+        val result = SmartCaptureParser.parse("Spinning lunes, miércoles y viernes a las 7", today)
+            as SmartCaptureResult.HabitDraft
+        assertEquals(setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY), result.input.days)
+        assertEquals(7, result.input.reminderHour)
+        assertEquals(0, result.input.reminderMinute)
+    }
 }

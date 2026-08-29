@@ -26,6 +26,7 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 ## Funciones incluidas
 
 - Crear, completar y eliminar tareas, con nota y marca de importancia.
+- Dividir una tarea en subtareas marcables; el progreso aparece como `2/5` en tareas, agenda y planner.
 - Crear hábitos con símbolo, categoría visual y días personalizados.
 - Marcar el cumplimiento diario y calcular rachas según los días programados.
 - Vista «Hoy» que reúne lo accionable y muestra progreso inmediato.
@@ -50,6 +51,7 @@ Descarga el APK desde la [última versión publicada](https://github.com/rck1996
 - Ilustraciones sketch por categoría de hábito: Hidratación, Autocuidado, Alimentación, Movimiento y Descanso.
 - Copia de seguridad JSON local mediante los selectores de exportación e importación de Android.
 - Recordatorios por tarea o hábito con cuatro entregas elegibles: notificación normal, alarma previa, alarma a la hora o ambas alarmas. La anticipación (5–30 min) y la duración sonora (15–60 s) son configurables; incluyen recuperación tras reinicio y acciones «Hecho», `+10 min` y `+30 min`.
+- Cada tarea y hábito puede elegir su propio modo de recordatorio, independientemente de la preferencia general.
 - Hábitos medibles por veces, minutos o pasos, con meta personalizada y progreso diario.
 - Captura inteligente en español con fechas, horas, prioridad y etiquetas, además de dictado por voz.
 - Búsqueda por texto y etiquetas, archivo, papelera recuperable y acción Deshacer.

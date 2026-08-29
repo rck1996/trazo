@@ -62,6 +62,7 @@ internal fun CalendarScreen(
     tasks: List<Task>, habits: List<Habit>, padding: PaddingValues,
     onTaskToggle: (String) -> Unit, onHabitToggle: (String, LocalDate) -> Unit,
     onHabitExceptionToggle: (String, LocalDate) -> Unit,
+    onSubtaskToggle: (String, String) -> Unit,
     onAddTask: (LocalDate) -> Unit
 ) {
     var mode by remember { mutableStateOf(CalendarMode.PLANNER) }
@@ -96,7 +97,7 @@ internal fun CalendarScreen(
             label = "calendar mode"
         ) { currentMode ->
             when (currentMode) {
-                CalendarMode.DAY -> DayAgenda(selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle, onHabitExceptionToggle, onAddTask)
+                CalendarMode.DAY -> DayAgenda(selectedDate, tasks, habits, padding, onTaskToggle, onHabitToggle, onHabitExceptionToggle, onSubtaskToggle, onAddTask)
                 CalendarMode.PLANNER -> WeekPlanner(selectedDate, tasks, habits, padding, onTaskToggle) {
                     selectedDate = it
                     visibleMonth = YearMonth.from(it)
@@ -159,6 +160,7 @@ private fun DayAgenda(
     date: LocalDate, tasks: List<Task>, habits: List<Habit>, padding: PaddingValues,
     onTaskToggle: (String) -> Unit, onHabitToggle: (String, LocalDate) -> Unit,
     onHabitExceptionToggle: (String, LocalDate) -> Unit,
+    onSubtaskToggle: (String, String) -> Unit,
     onAddTask: (LocalDate) -> Unit
 ) {
     val dayTasks = TaskSchedule.onDate(tasks, date).sortedBy { it.completed }
@@ -180,7 +182,7 @@ private fun DayAgenda(
             AgendaLabel("Tareas", dayTasks.count { it.completed }, dayTasks.size)
         }
         if (dayTasks.isEmpty()) item { CalendarEmpty("La página está libre", "Agrega algo para este día.") }
-        items(dayTasks, key = { it.id }) { task -> CalendarTaskRow(task, onTaskToggle) }
+        items(dayTasks, key = { it.id }) { task -> CalendarTaskRow(task, onTaskToggle, onSubtaskToggle) }
         item { AgendaLabel("Hábitos", dayHabits.count { HabitProgress.isComplete(it, date) }, dayHabits.size) }
         if (dayHabits.isEmpty()) item { CalendarEmpty("Sin rituales programados", "Este día puede respirar.") }
         items(dayHabits, key = { it.id }) { habit -> CalendarHabitRow(habit, date, onHabitToggle, onHabitExceptionToggle) }
@@ -197,22 +199,25 @@ private fun AgendaLabel(label: String, done: Int, total: Int) {
 }
 
 @Composable
-private fun CalendarTaskRow(task: Task, onToggle: (String) -> Unit) {
+private fun CalendarTaskRow(task: Task, onToggle: (String) -> Unit, onSubtaskToggle: (String, String) -> Unit) {
     Surface(
         color = if (task.completed) Leaf.copy(alpha = .16f) else PaperRaised,
         shape = RoundedCornerShape(13.dp),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp).fillMaxWidth()
     ) {
-        Row(Modifier.clickable { onToggle(task.id) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(task.completed, { onToggle(task.id) }, colors = CheckboxDefaults.colors(checkedColor = Leaf))
-            Column(Modifier.weight(1f)) {
-                Text(task.title, fontWeight = FontWeight.SemiBold, color = if (task.completed) MutedInk else Ink)
-                Text(
-                    "≈ ${if (task.durationMinutes >= 60) "${task.durationMinutes / 60} h" else "${task.durationMinutes} min"}",
-                    color = MutedInk, fontSize = 11.sp
-                )
-                if (task.note.isNotBlank()) Text(task.note, color = MutedInk, fontSize = 13.sp, maxLines = 1)
+        Column(Modifier.padding(10.dp)) {
+            Row(Modifier.clickable { onToggle(task.id) }, verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(task.completed, { onToggle(task.id) }, colors = CheckboxDefaults.colors(checkedColor = Leaf))
+                Column(Modifier.weight(1f)) {
+                    Text(task.title, fontWeight = FontWeight.SemiBold, color = if (task.completed) MutedInk else Ink)
+                    Text(
+                        "≈ ${if (task.durationMinutes >= 60) "${task.durationMinutes / 60} h" else "${task.durationMinutes} min"}",
+                        color = MutedInk, fontSize = 11.sp
+                    )
+                    if (task.note.isNotBlank()) Text(task.note, color = MutedInk, fontSize = 13.sp, maxLines = 1)
+                }
             }
+            TaskChecklist(task, onSubtaskToggle, compact = true)
         }
     }
 }
@@ -288,6 +293,15 @@ private fun PlannerDay(
                 Row(Modifier.fillMaxWidth().clickable { onTaskToggle(task.id) }.padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(18.dp)) { drawCircle(if (task.completed) completeDot else pendingDot, radius = 4.dp.toPx()) }
                     Text(task.title, modifier = Modifier.padding(start = 8.dp), color = if (task.completed) MutedInk else Ink, maxLines = 1)
+                    if (task.subtasks.isNotEmpty()) {
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "${task.subtasks.count { it.completed }}/${task.subtasks.size}",
+                            color = if (task.subtasks.all { it.completed }) Leaf else MutedInk,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
             if (tasks.size > 3) Text("+ ${tasks.size - 3} más", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(start = 26.dp, top = 4.dp))

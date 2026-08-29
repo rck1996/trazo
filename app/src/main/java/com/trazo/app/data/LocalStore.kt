@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import com.trazo.app.model.Habit
 import com.trazo.app.model.HabitCategory
 import com.trazo.app.model.HabitUnit
+import com.trazo.app.model.ItemReminderMode
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
 import com.trazo.app.model.TaskRecurrence
@@ -46,7 +47,7 @@ class LocalStore(private val context: Context) {
     }
 
     private fun encode(state: TrazoState) = JSONObject().apply {
-        put("version", 5)
+        put("version", 6)
         put("tasks", JSONArray().apply {
             state.tasks.forEach { task ->
                 put(JSONObject().apply {
@@ -63,6 +64,7 @@ class LocalStore(private val context: Context) {
                     put("subtasks", JSONArray(task.subtasks.map { JSONObject().apply { put("id", it.id); put("title", it.title); put("completed", it.completed) } }))
                     task.reminderHour?.let { put("reminderHour", it) }
                     put("reminderMinute", task.reminderMinute)
+                    task.reminderMode?.let { put("reminderMode", it.name) }
                     put("tags", JSONArray(task.tags.toList()))
                     put("archived", task.archived)
                     task.deletedAt?.let { put("deletedAt", it) }
@@ -87,6 +89,7 @@ class LocalStore(private val context: Context) {
                     put("unit", habit.unit.name)
                     habit.reminderHour?.let { put("reminderHour", it) }
                     put("reminderMinute", habit.reminderMinute)
+                    habit.reminderMode?.let { put("reminderMode", it.name) }
                     put("tags", JSONArray(habit.tags.toList()))
                     put("archived", habit.archived)
                     habit.deletedAt?.let { put("deletedAt", it) }
@@ -124,6 +127,8 @@ class LocalStore(private val context: Context) {
                     }.filter { it.title.isNotBlank() },
                     reminderHour = item.optInt("reminderHour", -1).takeIf { it >= 0 },
                     reminderMinute = item.optInt("reminderMinute", 0),
+                    reminderMode = item.optString("reminderMode").takeIf { it.isNotBlank() }
+                        ?.let { saved -> runCatching { ItemReminderMode.valueOf(saved) }.getOrNull() },
                     tags = item.optJSONArray("tags").toStringSet(),
                     archived = item.optBoolean("archived"),
                     deletedAt = item.optLong("deletedAt", -1L).takeIf { it >= 0L }
@@ -166,6 +171,8 @@ class LocalStore(private val context: Context) {
                         .getOrDefault(HabitUnit.CHECK),
                     reminderHour = item.optInt("reminderHour", -1).takeIf { it >= 0 },
                     reminderMinute = item.optInt("reminderMinute", 0),
+                    reminderMode = item.optString("reminderMode").takeIf { it.isNotBlank() }
+                        ?.let { saved -> runCatching { ItemReminderMode.valueOf(saved) }.getOrNull() },
                     tags = item.optJSONArray("tags").toStringSet(),
                     archived = item.optBoolean("archived"),
                     deletedAt = item.optLong("deletedAt", -1L).takeIf { it >= 0L },

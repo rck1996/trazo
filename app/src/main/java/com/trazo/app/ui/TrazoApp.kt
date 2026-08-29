@@ -119,6 +119,7 @@ import com.trazo.app.model.Habit
 import com.trazo.app.model.HabitCategory
 import com.trazo.app.model.HabitProgress
 import com.trazo.app.model.HabitUnit
+import com.trazo.app.model.ItemReminderMode
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
 import com.trazo.app.model.TaskRecurrence
@@ -172,6 +173,10 @@ fun TrazoApp(
     val toggleHabitWithFeedback: (String) -> Unit = { id ->
         if (hapticsEnabled) hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
         viewModel.toggleHabit(id)
+    }
+    val toggleSubtaskWithFeedback: (String, String) -> Unit = { taskId, subtaskId ->
+        if (hapticsEnabled) hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+        viewModel.toggleTaskSubtask(taskId, subtaskId)
     }
     LaunchedEffect(Unit) {
         NotificationCenter.createChannels(context)
@@ -237,6 +242,7 @@ fun TrazoApp(
                         habits = activeHabits,
                         contentPadding = padding,
                         onTaskToggle = toggleTaskWithFeedback,
+                        onSubtaskToggle = toggleSubtaskWithFeedback,
                         onHabitToggle = toggleHabitWithFeedback,
                         onAddTask = { composer = Composer.TASK },
                         onAddHabit = { composer = Composer.HABIT },
@@ -249,7 +255,7 @@ fun TrazoApp(
                         onSmartHabit = { habitDraft = it; composer = Composer.HABIT }
                     )
                     Section.TASKS -> TasksScreen(
-                        activeTasks, padding, toggleTaskWithFeedback, viewModel::deleteTask,
+                        activeTasks, padding, toggleTaskWithFeedback, toggleSubtaskWithFeedback, viewModel::deleteTask,
                         viewModel::setTaskDate, { editingTask = it; composer = Composer.TASK }, viewModel::archiveTask
                     )
                     Section.HABITS -> HabitsScreen(
@@ -260,6 +266,7 @@ fun TrazoApp(
                         activeTasks, activeHabits, padding, toggleTaskWithFeedback,
                         { id, date -> viewModel.toggleHabit(id, date) },
                         { id, date -> viewModel.toggleHabitException(id, date) },
+                        toggleSubtaskWithFeedback,
                         { date -> taskComposerDate = date; composer = Composer.TASK }
                     )
                     Section.FOCUS -> FocusScreen(activeTasks, padding, toggleTaskWithFeedback)
@@ -378,6 +385,7 @@ private fun PageHeader(
 private fun TodayScreen(
     tasks: List<Task>, habits: List<Habit>, contentPadding: PaddingValues,
     onTaskToggle: (String) -> Unit, onHabitToggle: (String) -> Unit,
+    onSubtaskToggle: (String, String) -> Unit,
     onAddTask: () -> Unit, onAddHabit: () -> Unit,
     onOpenPlanner: () -> Unit, onOpenFocus: () -> Unit,
     onExportBackup: () -> Unit, onImportBackup: () -> Unit,
@@ -423,7 +431,7 @@ private fun TodayScreen(
         }
         if (pending.isEmpty()) item { EmptyNote("Tu lista respira", "Anota una tarea pequeña para empezar.", onAddTask, R.drawable.widget_ai_task) }
         items(pending.take(4), key = { it.id }) { task ->
-            Box(Modifier.animateItem()) { TaskCard(task, onTaskToggle, null) }
+            Box(Modifier.animateItem()) { TaskCard(task, onTaskToggle, null, onSubtaskToggle = onSubtaskToggle) }
         }
         item { SectionTitle("Rituales de hoy", "la constancia también cuenta") }
         if (dueHabits.isEmpty()) item { EmptyNote("Sin rituales hoy", "Crea uno que se sienta tuyo.", onAddHabit, R.drawable.widget_ai_ritual) }
@@ -1111,6 +1119,7 @@ private fun ReminderTimeRow(
 @Composable
 private fun TasksScreen(
     tasks: List<Task>, padding: PaddingValues, onToggle: (String) -> Unit,
+    onSubtaskToggle: (String, String) -> Unit,
     onDelete: (String) -> Unit, onDateChange: (String, LocalDate?) -> Unit,
     onEdit: (Task) -> Unit, onArchive: (String) -> Unit
 ) {
@@ -1140,7 +1149,7 @@ private fun TasksScreen(
         }
         items(visible, key = { it.id }) {
             Box(Modifier.animateItem()) {
-                TaskCard(it, onToggle, onDelete, { date -> onDateChange(it.id, date) }, { onEdit(it) }, { onArchive(it.id) })
+                TaskCard(it, onToggle, onDelete, { date -> onDateChange(it.id, date) }, { onEdit(it) }, { onArchive(it.id) }, onSubtaskToggle)
             }
         }
     }
@@ -1283,7 +1292,8 @@ private fun SectionTitle(title: String, note: String) {
 private fun TaskCard(
     task: Task, onToggle: (String) -> Unit, onDelete: ((String) -> Unit)?,
     onDateChange: ((LocalDate?) -> Unit)? = null, onEdit: (() -> Unit)? = null,
-    onArchive: (() -> Unit)? = null
+    onArchive: (() -> Unit)? = null,
+    onSubtaskToggle: ((String, String) -> Unit)? = null
 ) {
     val reducedMotion = LocalReducedMotion.current
     val minimalMode = LocalMinimalMode.current
@@ -1334,6 +1344,7 @@ private fun TaskCard(
                 }
                 if (task.priority == TaskPriority.IMPORTANT && !task.completed) Text("!", color = Coral, fontWeight = FontWeight.Black, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
             }
+            onSubtaskToggle?.let { TaskChecklist(task, it) }
             if (onEdit != null || onDateChange != null || onArchive != null || onDelete != null) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 56.dp, end = 8.dp, bottom = 7.dp),
@@ -1346,6 +1357,49 @@ private fun TaskCard(
                     if (onDelete != null) DeleteButton("tarea") { onDelete(task.id) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun TaskChecklist(
+    task: Task,
+    onSubtaskToggle: (String, String) -> Unit,
+    compact: Boolean = false
+) {
+    if (task.subtasks.isEmpty()) return
+    val completed = task.subtasks.count { it.completed }
+    val visibleItems = if (compact) task.subtasks.take(2) else task.subtasks
+    Column(Modifier.fillMaxWidth().padding(start = 58.dp, end = 14.dp, bottom = 8.dp)) {
+        Text(
+            "$completed / ${task.subtasks.size} pasos",
+            color = if (completed == task.subtasks.size) Leaf else MutedInk,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
+        visibleItems.forEach { subtask ->
+            Row(
+                Modifier.fillMaxWidth().clickable { onSubtaskToggle(task.id, subtask.id) }.padding(vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = subtask.completed,
+                    onCheckedChange = { onSubtaskToggle(task.id, subtask.id) },
+                    colors = CheckboxDefaults.colors(checkedColor = Leaf),
+                    modifier = Modifier.size(30.dp)
+                )
+                Text(
+                    subtask.title,
+                    color = if (subtask.completed) MutedInk else Ink,
+                    textDecoration = if (subtask.completed) TextDecoration.LineThrough else null,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 5.dp)
+                )
+            }
+        }
+        if (compact && task.subtasks.size > visibleItems.size) {
+            Text("+ ${task.subtasks.size - visibleItems.size} pasos", color = MutedInk, fontSize = 11.sp)
         }
     }
 }
@@ -1607,6 +1661,7 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
     var subtasksText by remember(task, draft) { mutableStateOf(task?.subtasks?.joinToString("\n") { it.title } ?: draft?.subtasks?.joinToString("\n") { it.title } ?: "") }
     var reminderHour by remember(task, draft) { mutableStateOf(task?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(task, draft) { mutableIntStateOf(task?.reminderMinute ?: draft?.reminderMinute ?: 0) }
+    var reminderMode by remember(task, draft) { mutableStateOf(task?.reminderMode ?: draft?.reminderMode) }
     var reminderText by remember(task, draft) { mutableStateOf((task?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, task?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
     var tags by remember(task, draft) { mutableStateOf((task?.tags ?: draft?.tags.orEmpty()).joinToString(", ")) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -1716,11 +1771,12 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
                 }
             }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
             ReminderReadinessNote(reminderHour != null)
+            if (reminderHour != null) ItemReminderModePicker(reminderMode) { reminderMode = it }
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
             SaveButton(if (task == null) "Guardar tarea" else "Guardar cambios", title.isNotBlank()) {
                 onSave(TaskInput(title = title, note = note, important = important, dueDate = dueDate,
                     durationMinutes = durationMinutes, recurrence = recurrence, reminderHour = reminderHour,
-                    reminderMinute = reminderMinute, tags = parseTags(tags),
+                    reminderMinute = reminderMinute, reminderMode = reminderMode.takeIf { reminderHour != null }, tags = parseTags(tags),
                     subtasks = subtasksText.lines().mapNotNull { it.trim().takeIf(String::isNotBlank) }.map { TaskSubtask(title = it) }))
             }
         }
@@ -1746,6 +1802,43 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
 private fun RowScope.TimeChoice(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(onClick = onClick, color = if (selected) Leaf else Ink.copy(alpha = .05f), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f)) {
         Text(label, color = if (selected) Color.White else MutedInk, fontSize = 10.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(vertical = 8.dp))
+    }
+}
+
+/** Lets an item override the global reminder style without hiding the default. */
+@Composable
+private fun ItemReminderModePicker(selected: ItemReminderMode?, onSelected: (ItemReminderMode?) -> Unit) {
+    val options = listOf(
+        null to "Según ajustes",
+        ItemReminderMode.NOTIFICATION to "Aviso",
+        ItemReminderMode.EARLY_ALARM to "Previa",
+        ItemReminderMode.ON_TIME_ALARM to "En hora",
+        ItemReminderMode.BOTH_ALARMS to "Ambas"
+    )
+    Text("Cómo avisarte", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 9.dp, bottom = 4.dp))
+    options.chunked(3).forEach { row ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            row.forEach { (mode, label) ->
+                val active = mode == selected
+                Surface(
+                    onClick = { onSelected(mode) },
+                    color = if (active) Coral else Ink.copy(alpha = .05f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        label,
+                        color = if (active) Color.White else MutedInk,
+                        fontSize = 10.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            }
+            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+        }
+        Spacer(Modifier.height(5.dp))
     }
 }
 
@@ -1775,6 +1868,7 @@ private fun HabitComposer(
     var unit by remember(habit, draft) { mutableStateOf(habit?.unit ?: draft?.unit ?: HabitUnit.CHECK) }
     var reminderHour by remember(habit, draft) { mutableStateOf(habit?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(habit, draft) { mutableIntStateOf(habit?.reminderMinute ?: draft?.reminderMinute ?: 0) }
+    var reminderMode by remember(habit, draft) { mutableStateOf(habit?.reminderMode ?: draft?.reminderMode) }
     var reminderText by remember(habit, draft) { mutableStateOf((habit?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, habit?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
     var tags by remember(habit, draft) { mutableStateOf((habit?.tags ?: draft?.tags.orEmpty()).joinToString(", ")) }
     val labels = mapOf(
@@ -1884,6 +1978,7 @@ private fun HabitComposer(
                 parsed?.let { (h, m) -> reminderHour = h; reminderMinute = m }
             }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
             ReminderReadinessNote(reminderHour != null)
+            if (reminderHour != null) ItemReminderModePicker(reminderMode) { reminderMode = it }
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
             Spacer(Modifier.height(22.dp))
             SaveButton(if (habit == null) "Crear hábito" else "Guardar cambios", title.isNotBlank() && days.isNotEmpty()) {
@@ -1893,6 +1988,7 @@ private fun HabitComposer(
                     skippedDates = skippedDates,
                     target = target, unit = unit,
                     reminderHour = reminderHour, reminderMinute = reminderMinute,
+                    reminderMode = reminderMode.takeIf { reminderHour != null },
                     tags = parseTags(tags)
                 ))
             }

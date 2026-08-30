@@ -2,6 +2,7 @@
 
 ## 3.9.0 (en validación)
 
+- Pomodoro 2×1 recompuesto para launchers compactos: sin recortes, vista previa sin contadores superpuestos y control ▶/■ de ancho seguro.
 - Catálogo simplificado a tres widgets: panel detallado, Pomodoro horizontal 2×1 y Captura inteligente.
 - Captura 4×1, con formato de barra horizontal, permite elegir escritura o voz; la escritura abre directamente el intérprete de Trazo.
 - Pomodoro compacto muestra cuenta regresiva viva, tarea asociada, tomate/taza según la fase y control iniciar/detener.

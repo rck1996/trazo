@@ -84,14 +84,14 @@ class FocusWidget : AppWidgetProvider() {
                     setViewVisibility(R.id.focus_widget_idle_time, View.VISIBLE)
                     val minutes = nextTask?.durationMinutes?.coerceIn(1, 180) ?: 25
                     setTextViewText(R.id.focus_widget_idle_time, "%02d:00".format(minutes))
-                    setTextViewText(R.id.focus_widget_action, "▶  $minutes min")
+                    setTextViewText(R.id.focus_widget_action, "▶")
                 } else {
                     val base = SystemClock.elapsedRealtime() + (session.endAt - System.currentTimeMillis())
                     setViewVisibility(R.id.focus_widget_timer, View.VISIBLE)
                     setViewVisibility(R.id.focus_widget_idle_time, View.GONE)
                     setChronometer(R.id.focus_widget_timer, base, null, true)
                     setChronometerCountDown(R.id.focus_widget_timer, true)
-                    setTextViewText(R.id.focus_widget_action, "■  Parar")
+                    setTextViewText(R.id.focus_widget_action, "■")
                 }
             }
         }

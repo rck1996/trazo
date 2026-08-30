@@ -6,13 +6,13 @@
     android:background="@drawable/widget_paper"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingHorizontal="10dp"
-    android:paddingVertical="6dp">
+    android:paddingHorizontal="6dp"
+    android:paddingVertical="3dp">
 
     <ImageView
         android:id="@+id/focus_widget_art"
-        android:layout_width="42dp"
-        android:layout_height="42dp"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
         android:contentDescription="Tomate de enfoque dibujado"
         android:scaleType="centerInside"
         android:src="@drawable/widget_tomato" />
@@ -20,32 +20,33 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_marginStart="7dp"
-        android:layout_marginEnd="6dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
         android:layout_weight="1"
         android:gravity="center_vertical"
         android:orientation="vertical">
         <TextView android:id="@+id/focus_widget_phase" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1"
             android:text="@string/widget_focus_mode" android:textColor="#E9654B"
-            android:textSize="9sp" android:textStyle="bold" />
+            android:textSize="7sp" android:textStyle="bold" />
         <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
             <Chronometer android:id="@+id/focus_widget_timer" android:layout_width="match_parent"
                 android:layout_height="match_parent" android:fontFamily="sans-serif-black"
-                android:gravity="center_vertical" android:textColor="#272522" android:textSize="25sp" />
+                android:gravity="center_vertical" android:textColor="#272522" android:textSize="21sp"
+                android:visibility="gone" />
             <TextView android:id="@+id/focus_widget_idle_time" android:layout_width="match_parent"
                 android:layout_height="match_parent" android:fontFamily="sans-serif-black"
                 android:gravity="center_vertical" android:text="@string/widget_default_time"
-                android:textColor="#272522" android:textSize="25sp" />
+                android:textColor="#272522" android:textSize="21sp" />
         </FrameLayout>
         <TextView android:id="@+id/focus_widget_task" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1"
-            android:text="@string/widget_one_stroke" android:textColor="#6F6961" android:textSize="9sp" />
+            android:text="@string/widget_one_stroke" android:textColor="#6F6961" android:textSize="7sp" />
     </LinearLayout>
 
-    <TextView android:id="@+id/focus_widget_action" android:layout_width="82dp"
-        android:layout_height="42dp" android:background="@drawable/widget_button_coral"
-        android:gravity="center" android:maxLines="2" android:paddingHorizontal="5dp"
-        android:text="@string/widget_start" android:textColor="#FFFFFF"
-        android:textSize="10sp" android:textStyle="bold" />
+    <TextView android:id="@+id/focus_widget_action" android:layout_width="34dp"
+        android:layout_height="34dp" android:background="@drawable/widget_button_coral"
+        android:contentDescription="Iniciar o detener Pomodoro" android:gravity="center"
+        android:maxLines="1" android:text="▶" android:textColor="#FFFFFF"
+        android:textSize="14sp" android:textStyle="bold" />
 </LinearLayout>

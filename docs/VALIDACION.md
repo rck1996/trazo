@@ -3,7 +3,7 @@
 ## Validación de la versión 3.9.0 — 29 de agosto de 2026
 
 - El launcher del emulador expone exactamente tres proveedores: `Trazo · Mi día`, `Trazo · Pomodoro` y `Trazo · Capturar`.
-- Pomodoro se presenta como 2×1 y Capturar como acceso compacto con acciones independientes de escritura y voz.
+- Pomodoro se presenta como 2×1 y Capturar como barra 4×1 con acciones independientes de escritura y voz.
 - La acción escrita fue lanzada mediante el mismo `Intent` del widget y abrió directamente la hoja «¿Qué quieres capturar?».
 - `testDebugUnitTest`: correcto, incluidos valores compatibles de la reestructuración.
 - `lintDebug`: correcto, sin errores.
@@ -12,7 +12,7 @@
 - Inicio limpio comprobado: onboarding de tres pasos visible y omisión persistente.
 - Revisión visual a 1080 × 2400 de onboarding, Hoy Equilibrado y Ajustes por subsecciones.
 - Navegación instrumentada por Calendario, sus tres vistas, Enfoque y editor avanzado con dependencias.
-- SHA-256 del APK: `E761DF7EB3C18B1843C12C3423B8C9C8FDD7390DDA19DC56C277DB2B60825B19`.
+- SHA-256 del APK: `71A3F2D5B905956B507F53B6EB7702465DC53C429B8E14D47B2DA31284FC07FE`.
 
 Fecha: 11 de julio de 2026
 

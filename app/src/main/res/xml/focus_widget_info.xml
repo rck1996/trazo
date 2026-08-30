@@ -4,9 +4,9 @@
     android:initialLayout="@layout/focus_widget"
     android:previewLayout="@layout/focus_widget"
     android:minWidth="110dp"
-    android:minHeight="110dp"
-    android:resizeMode="horizontal|vertical"
+    android:minHeight="40dp"
+    android:resizeMode="horizontal"
     android:targetCellWidth="2"
-    android:targetCellHeight="2"
+    android:targetCellHeight="1"
     android:updatePeriodMillis="1800000"
     android:widgetCategory="home_screen" />

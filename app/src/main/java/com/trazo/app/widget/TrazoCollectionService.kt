@@ -99,6 +99,9 @@ class TrazoCollectionService : RemoteViewsService() {
 
         private fun taskView(position: Int): RemoteViews? {
             val task = tasks.getOrNull(position) ?: return null
+            val completedSteps = task.subtasks.count { it.completed }
+            val stepsLabel = task.subtasks.takeIf { it.isNotEmpty() }
+                ?.let { "$completedSteps/${it.size} pasos" }
             return RemoteViews(context.packageName, R.layout.widget_task_stack_item).apply {
                 val config = WidgetPreferences.load(context, widgetId)
                 val minimal = config.style == WidgetStyle.MINIMAL
@@ -124,7 +127,9 @@ class TrazoCollectionService : RemoteViewsService() {
                 setTextViewText(
                     R.id.widget_task_item_meta,
                     if (config.privacy == WidgetPrivacy.DISCREET) "Toca ✓ cuando esté listo"
-                    else task.note.ifBlank { "Toca ✓ cuando esté listo" }
+                    else listOfNotNull(stepsLabel, task.note.takeIf { it.isNotBlank() })
+                        .joinToString(" · ")
+                        .ifBlank { "Toca ✓ cuando esté listo" }
                 )
                 setContentDescription(R.id.widget_task_item_complete,
                     if (config.privacy == WidgetPrivacy.DISCREET) "Completar tarea privada" else "Completar ${task.title}")

@@ -216,7 +216,18 @@ internal fun FocusScreen(tasks: List<Task>, padding: PaddingValues, onTaskComple
         }
         if (pending.isEmpty()) item { Text("No hay tareas pendientes.", color = MutedInk, modifier = Modifier.padding(24.dp)) }
         items(pending.take(8), key = { it.id }) { task ->
-            FocusTask(task, task.id == selectedTaskId) { selectedTaskId = if (selectedTaskId == task.id) null else task.id }
+            FocusTask(task, task.id == selectedTaskId) {
+                if (running) return@FocusTask
+                val selecting = selectedTaskId != task.id
+                selectedTaskId = if (selecting) task.id else null
+                // A task carries its own estimate. Use it as the focus block so
+                // long tasks no longer look disconnected from the Pomodoro.
+                if (selecting) {
+                    focusMinutes = task.durationMinutes.coerceIn(1, 180)
+                    phaseName = FocusPhase.FOCUS.name
+                    remaining = focusMinutes * 60
+                }
+            }
         }
         if (selectedTask != null) item {
             TextButton(onClick = { onTaskComplete(selectedTask.id); selectedTaskId = null }, modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth()) {
@@ -482,8 +493,12 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
             pop.snapTo(1f); tilt.snapTo(0f)
         }
     }
-    Box(
-        Modifier.fillMaxWidth().padding(vertical = 14.dp)
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+      Box(
+        Modifier.fillMaxWidth().height(260.dp)
             .graphicsLayer {
                 val livingScale = if (running && motionEnabled) breathe else 1f
                 scaleX = pop.value * livingScale
@@ -491,7 +506,7 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
                 rotationZ = tilt.value + if (running && motionEnabled) sway else 0f
             },
         contentAlignment = Alignment.Center
-    ) {
+      ) {
         AnimatedContent(
             targetState = artState,
             transitionSpec = {
@@ -550,17 +565,18 @@ private fun TomatoTimer(remaining: Int, total: Int, phase: FocusPhase, taskTitle
                 }
             }
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 22.dp)) {
+      }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 4.dp)) {
             Text(
                 when { paused -> "PAUSA"; phase == FocusPhase.FOCUS -> "ENFOQUE"; else -> "DESCANSO" },
                 color = if (phase == FocusPhase.FOCUS) Coral else Leaf,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp
             )
-            Surface(color = Paper.copy(alpha = .94f), shape = RoundedCornerShape(10.dp, 18.dp, 12.dp, 16.dp), modifier = Modifier.padding(vertical = 5.dp)) {
+            Surface(color = PaperRaised, shape = RoundedCornerShape(10.dp, 18.dp, 12.dp, 16.dp), modifier = Modifier.padding(vertical = 5.dp)) {
                 Text("%02d:%02d".format(remaining/60,remaining%60), fontSize=46.sp, fontWeight=FontWeight.Black, color=Ink, modifier=Modifier.padding(horizontal = 18.dp, vertical = 2.dp))
             }
-            Text(contextMessage, color=MutedInk, fontSize=13.sp, maxLines=2, overflow=TextOverflow.Ellipsis, textAlign=androidx.compose.ui.text.style.TextAlign.Center, modifier=Modifier.width(190.dp).padding(top=4.dp))
+            Text(contextMessage, color=MutedInk, fontSize=13.sp, maxLines=2, overflow=TextOverflow.Ellipsis, textAlign=androidx.compose.ui.text.style.TextAlign.Center, modifier=Modifier.fillMaxWidth().padding(horizontal=32.dp, vertical=4.dp))
         }
     }
 }

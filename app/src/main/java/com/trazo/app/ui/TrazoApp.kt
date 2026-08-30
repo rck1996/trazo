@@ -42,9 +42,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -77,6 +79,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -111,6 +114,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.trazo.app.TrazoViewModel
 import com.trazo.app.TaskInput
 import com.trazo.app.HabitInput
@@ -119,9 +124,14 @@ import com.trazo.app.model.Habit
 import com.trazo.app.model.HabitCategory
 import com.trazo.app.model.HabitProgress
 import com.trazo.app.model.HabitUnit
+import com.trazo.app.model.ItemReminderMode
 import com.trazo.app.model.Task
 import com.trazo.app.model.TaskPriority
+import com.trazo.app.model.TaskRecurrence
+import com.trazo.app.model.TaskSubtask
 import com.trazo.app.model.TaskSchedule
+import com.trazo.app.model.CategoryDefinition
+import com.trazo.app.model.TaskTemplate
 import com.trazo.app.model.TrazoState
 import com.trazo.app.notifications.NotificationCenter
 import com.trazo.app.notifications.ReminderHistory
@@ -130,11 +140,18 @@ import com.trazo.app.notifications.ReminderPreferences
 import com.trazo.app.notifications.ReminderSettings
 import com.trazo.app.notifications.ReminderStatus
 import com.trazo.app.data.AppSettings
+import com.trazo.app.data.TaskDateFilter
+import com.trazo.app.data.TaskFilterSelection
+import com.trazo.app.data.TaskFiltering
+import com.trazo.app.data.TaskPriorityFilter
+import com.trazo.app.data.TaskStatusFilter
+import com.trazo.app.data.TaskProgressInsights
 import com.trazo.app.data.ReviewInsights
 import com.trazo.app.data.ReviewSummary
 import com.trazo.app.data.SmartCaptureParser
 import com.trazo.app.data.SmartCaptureResult
 import com.trazo.app.data.ThemePreference
+import com.trazo.app.data.TodayLayout
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -144,17 +161,16 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private enum class Section(val label: String, val icon: TrazoIconKind) {
-    TODAY("Hoy", TrazoIconKind.TODAY), TASKS("Tareas", TrazoIconKind.TASK), CALENDAR("Planner", TrazoIconKind.CALENDAR),
+    TODAY("Hoy", TrazoIconKind.TODAY), TASKS("Tareas", TrazoIconKind.TASK), CALENDAR("Calendario", TrazoIconKind.CALENDAR),
     HABITS("Hábitos", TrazoIconKind.HABIT), FOCUS("Enfoque", TrazoIconKind.FOCUS)
 }
 
 private enum class Composer { TASK, HABIT }
-private enum class TaskFilter(val label: String) { OPEN("Pendientes"), TODAY("Hoy"), DONE("Hechas"), ALL("Todas") }
-
 @Composable
 fun TrazoApp(
     viewModel: TrazoViewModel,
     requestedSection: String? = null,
+    requestedCapture: Int = 0,
     onExportBackup: () -> Unit = {},
     onImportBackup: () -> Unit = {}
 ) {
@@ -171,10 +187,15 @@ fun TrazoApp(
         if (hapticsEnabled) hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
         viewModel.toggleHabit(id)
     }
+    val toggleSubtaskWithFeedback: (String, String) -> Unit = { taskId, subtaskId ->
+        if (hapticsEnabled) hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+        viewModel.toggleTaskSubtask(taskId, subtaskId)
+    }
     LaunchedEffect(Unit) {
         NotificationCenter.createChannels(context)
     }
     val state by viewModel.state
+    val appSettings by viewModel.settings
     var section by remember { mutableStateOf(Section.TODAY) }
     LaunchedEffect(requestedSection) {
         Section.entries.firstOrNull { it.name == requestedSection }?.let { section = it }
@@ -189,6 +210,7 @@ fun TrazoApp(
     val activeTasks = state.tasks.filter { !it.archived && it.deletedAt == null }
     val activeHabits = state.habits.filter { !it.archived && it.deletedAt == null }
     val undo = viewModel.undoAction.value
+    val parentSuggestion = viewModel.parentCompletionSuggestion.value
     LaunchedEffect(undo) {
         undo?.let {
             val result = snackbar.showSnackbar(it.message, "Deshacer")
@@ -204,7 +226,7 @@ fun TrazoApp(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = { SketchNavigation(section) { section = it } },
             floatingActionButton = {
-                if (section != Section.FOCUS && section != Section.TODAY) {
+                if (section != Section.FOCUS && section != Section.TODAY && section != Section.CALENDAR) {
                 FloatingActionButton(
                     onClick = {
                         taskComposerDate = if (section == Section.CALENDAR) LocalDate.now() else null
@@ -235,6 +257,7 @@ fun TrazoApp(
                         habits = activeHabits,
                         contentPadding = padding,
                         onTaskToggle = toggleTaskWithFeedback,
+                        onSubtaskToggle = toggleSubtaskWithFeedback,
                         onHabitToggle = toggleHabitWithFeedback,
                         onAddTask = { composer = Composer.TASK },
                         onAddHabit = { composer = Composer.HABIT },
@@ -245,9 +268,10 @@ fun TrazoApp(
                         viewModel = viewModel,
                         onSmartTask = { taskDraft = it; composer = Composer.TASK },
                         onSmartHabit = { habitDraft = it; composer = Composer.HABIT }
+                        , requestedCapture = requestedCapture
                     )
                     Section.TASKS -> TasksScreen(
-                        activeTasks, padding, toggleTaskWithFeedback, viewModel::deleteTask,
+                        activeTasks, padding, toggleTaskWithFeedback, toggleSubtaskWithFeedback, viewModel::deleteTask,
                         viewModel::setTaskDate, { editingTask = it; composer = Composer.TASK }, viewModel::archiveTask
                     )
                     Section.HABITS -> HabitsScreen(
@@ -258,6 +282,9 @@ fun TrazoApp(
                         activeTasks, activeHabits, padding, toggleTaskWithFeedback,
                         { id, date -> viewModel.toggleHabit(id, date) },
                         { id, date -> viewModel.toggleHabitException(id, date) },
+                        toggleSubtaskWithFeedback,
+                        viewModel::rescheduleTask,
+                        { task -> editingTask = task; composer = Composer.TASK },
                         { date -> taskComposerDate = date; composer = Composer.TASK }
                     )
                     Section.FOCUS -> FocusScreen(activeTasks, padding, toggleTaskWithFeedback)
@@ -271,7 +298,12 @@ fun TrazoApp(
             task = editingTask,
             draft = taskDraft,
             initialDate = taskComposerDate,
+            categories = state.categories,
+            templates = state.taskTemplates,
+            advancedInitially = appSettings.taskAdvancedExpanded,
+            onAdvancedChanged = { viewModel.updateSettings(appSettings.copy(taskAdvancedExpanded = it)) },
             onDismiss = { composer = null; editingTask = null },
+            onSaveTemplate = viewModel::saveTaskTemplate,
             onSave = { input ->
                 editingTask?.let { viewModel.updateTask(it.id, input) }
                     ?: viewModel.addTask(input)
@@ -283,6 +315,8 @@ fun TrazoApp(
         Composer.HABIT -> HabitComposer(
             habit = editingHabit,
             draft = habitDraft,
+            advancedInitially = appSettings.habitAdvancedExpanded,
+            onAdvancedChanged = { viewModel.updateSettings(appSettings.copy(habitAdvancedExpanded = it)) },
             onDismiss = { composer = null; editingHabit = null },
             onSave = { input ->
                 editingHabit?.let { viewModel.updateHabit(it.id, input) }
@@ -293,6 +327,55 @@ fun TrazoApp(
             }
         )
         null -> Unit
+    }
+    if (parentSuggestion != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissParentCompletionSuggestion,
+            title = { Text("Lista completa") },
+            text = { Text("Terminaste todas las subtareas. ¿Quieres marcar también la tarea principal como completada?") },
+            confirmButton = { TextButton(onClick = viewModel::completeSuggestedParent) { Text("Completar tarea") } },
+            dismissButton = { TextButton(onClick = viewModel::dismissParentCompletionSuggestion) { Text("Ahora no") } }
+        )
+    }
+    if (!appSettings.onboardingCompleted) {
+        OnboardingDialog(
+            onFinish = { viewModel.updateSettings(appSettings.copy(onboardingCompleted = true, seenRestructureTour = true)) },
+            onSkip = { viewModel.updateSettings(appSettings.copy(onboardingCompleted = true)) }
+        )
+    }
+}
+
+@Composable
+private fun OnboardingDialog(onFinish: () -> Unit, onSkip: () -> Unit) {
+    var page by remember { mutableIntStateOf(0) }
+    val pages = listOf(
+        Triple("UN TRAZO A LA VEZ", "Organiza sin ruido", "Hoy reúne la siguiente acción, tus rituales y el tiempo de enfoque en un único lugar."),
+        Triple("CAPTURA NATURAL", "Escríbelo como lo dirías", "Trazo interpreta tareas y hábitos con días, horas y prioridades. También puedes dictarlos por voz."),
+        Triple("TU PROPIO RITMO", "Adapta la experiencia", "Elige un inicio Enfoque, Equilibrado o Panorama. Tus datos siguen siendo locales y privados.")
+    )
+    val current = pages[page]
+    Dialog(onDismissRequest = onSkip, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = Paper) {
+            Column(
+                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(28.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(current.first, color = Coral, fontWeight = FontWeight.Black, letterSpacing = 1.4.sp)
+                Text(current.second, style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(top = 8.dp))
+                Text(current.third, color = MutedInk, fontSize = 17.sp, modifier = Modifier.padding(top = 14.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 34.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    pages.indices.forEach { index ->
+                        Box(Modifier.weight(1f).height(5.dp).clip(CircleShape).background(if (index <= page) Coral else Ink.copy(alpha = .10f)))
+                    }
+                }
+                Button(
+                    onClick = { if (page == pages.lastIndex) onFinish() else page++ },
+                    modifier = Modifier.fillMaxWidth().padding(top = 28.dp).height(54.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) { Text(if (page == pages.lastIndex) "Entrar a mi estudio" else "Siguiente", color = Color.White) }
+                TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Omitir", color = MutedInk) }
+            }
+        }
     }
 }
 
@@ -376,15 +459,18 @@ private fun PageHeader(
 private fun TodayScreen(
     tasks: List<Task>, habits: List<Habit>, contentPadding: PaddingValues,
     onTaskToggle: (String) -> Unit, onHabitToggle: (String) -> Unit,
+    onSubtaskToggle: (String, String) -> Unit,
     onAddTask: () -> Unit, onAddHabit: () -> Unit,
     onOpenPlanner: () -> Unit, onOpenFocus: () -> Unit,
     onExportBackup: () -> Unit, onImportBackup: () -> Unit,
     viewModel: TrazoViewModel,
     onSmartTask: (TaskInput) -> Unit,
-    onSmartHabit: (HabitInput) -> Unit
+    onSmartHabit: (HabitInput) -> Unit,
+    requestedCapture: Int = 0
 ) {
     var showSettings by remember { mutableStateOf(false) }
     var showCapture by remember { mutableStateOf(false) }
+    LaunchedEffect(requestedCapture) { if (requestedCapture > 0) showCapture = true }
     var weeklyReview by remember { mutableStateOf(false) }
     val today = LocalDate.now()
     val relevantTasks = TaskSchedule.actionable(tasks, today)
@@ -392,6 +478,7 @@ private fun TodayScreen(
     val dueHabits = habits.filter { HabitProgress.isScheduled(it, today) }
     val done = relevantTasks.count { it.completed } + dueHabits.count { HabitProgress.isComplete(it, today) }
     val total = relevantTasks.size + dueHabits.size
+    val appSettings by viewModel.settings
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 96.dp)
@@ -408,6 +495,8 @@ private fun TodayScreen(
         item {
             ProgressNote(done, total)
             QuickActions({ showCapture = true }, onOpenPlanner, onOpenFocus)
+        }
+        if (appSettings.todayLayout == TodayLayout.OVERVIEW) item {
             val periodFocusMinutes = if (weeklyReview) viewModel.focusStats().weekMinutes else viewModel.focusStats().todayMinutes
             ReviewCard(
                 if (weeklyReview) ReviewInsights.weekly(tasks, habits, today, periodFocusMinutes)
@@ -417,16 +506,44 @@ private fun TodayScreen(
                 focusMinutes = periodFocusMinutes,
                 onOpenPlanner = onOpenPlanner
             )
+        }
+        item {
+            if (appSettings.nightReviewEnabled && LocalTime.now().hour >= appSettings.nightReviewHour && pending.isNotEmpty()) {
+                NightReviewCard(
+                    tasks = pending,
+                    onComplete = viewModel::toggleTask,
+                    onTomorrow = { viewModel.setTaskDate(it, today.plusDays(1)) },
+                    onArchive = viewModel::archiveTask
+                )
+            }
             SectionTitle("Siguiente trazo", "solo lo que importa ahora")
         }
         if (pending.isEmpty()) item { EmptyNote("Tu lista respira", "Anota una tarea pequeña para empezar.", onAddTask, R.drawable.widget_ai_task) }
-        items(pending.take(4), key = { it.id }) { task ->
-            Box(Modifier.animateItem()) { TaskCard(task, onTaskToggle, null) }
+        items(pending.take(if (appSettings.todayLayout == TodayLayout.FOCUS) 2 else 4), key = { it.id }) { task ->
+            Box(Modifier.animateItem()) { TaskCard(task, onTaskToggle, null, onSubtaskToggle = onSubtaskToggle) }
         }
         item { SectionTitle("Rituales de hoy", "la constancia también cuenta") }
         if (dueHabits.isEmpty()) item { EmptyNote("Sin rituales hoy", "Crea uno que se sienta tuyo.", onAddHabit, R.drawable.widget_ai_ritual) }
         items(dueHabits, key = { it.id }) { habit ->
             Box(Modifier.animateItem()) { HabitCard(habit, onHabitToggle, null) }
+        }
+        item {
+            FeatureHubCard(
+                onCalendar = onOpenPlanner,
+                onTaskTools = onAddTask,
+                onOrganize = onAddTask
+            )
+        }
+        if (appSettings.todayLayout != TodayLayout.OVERVIEW) item {
+            val periodFocusMinutes = if (weeklyReview) viewModel.focusStats().weekMinutes else viewModel.focusStats().todayMinutes
+            ReviewCard(
+                if (weeklyReview) ReviewInsights.weekly(tasks, habits, today, periodFocusMinutes)
+                else ReviewInsights.daily(tasks, habits, today, periodFocusMinutes),
+                weeklyReview,
+                onTogglePeriod = { weeklyReview = !weeklyReview },
+                focusMinutes = periodFocusMinutes,
+                onOpenPlanner = onOpenPlanner
+            )
         }
     }
     if (showSettings) {
@@ -450,6 +567,85 @@ private fun TodayScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun FeatureHubCard(
+    onCalendar: () -> Unit,
+    onTaskTools: () -> Unit,
+    onOrganize: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Surface(
+        onClick = { expanded = !expanded },
+        color = Sky.copy(alpha = .10f),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 7.dp).fillMaxWidth().sketchBorder(Sky.copy(alpha = .42f))
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("HERRAMIENTAS", color = Leaf, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.2.sp)
+                    Text(if (expanded) "Elige dónde continuar" else "Calendario · organización · avisos", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
+                Text(if (expanded) "Cerrar ↑" else "Abrir ↓", color = Coral, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+            AnimatedVisibility(expanded) {
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FeatureShortcut("▦", "Calendario", "Día · semana · mes", onCalendar, Modifier.weight(1f))
+                        FeatureShortcut("↳", "Subtareas", "Dependencias", onTaskTools, Modifier.weight(1f))
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FeatureShortcut("✦", "Organizar", "Categorías · plantillas", onOrganize, Modifier.weight(1f))
+                        FeatureShortcut("◉", "Alarmas", "Configurar por tarea", onTaskTools, Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeatureShortcut(
+    symbol: String, title: String, subtitle: String, onClick: () -> Unit, modifier: Modifier = Modifier
+) {
+    Surface(onClick = onClick, color = Paper.copy(alpha = .82f), shape = RoundedCornerShape(12.dp), modifier = modifier) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 9.dp)) {
+            Text("$symbol  $title", color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(subtitle, color = MutedInk, fontSize = 10.sp, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun NightReviewCard(
+    tasks: List<Task>,
+    onComplete: (String) -> Unit,
+    onTomorrow: (String) -> Unit,
+    onArchive: (String) -> Unit
+) {
+    Surface(
+        color = Lavender.copy(alpha = .13f),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 7.dp).fillMaxWidth().sketchBorder(Lavender.copy(alpha = .35f))
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("CIERRE DEL DÍA", color = Lavender, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.1.sp)
+            Text("Deja mañana despejado", color = Ink, fontWeight = FontWeight.Black, fontSize = 18.sp)
+            Text("Completa, mueve o archiva lo que quedó pendiente.", color = MutedInk, fontSize = 12.sp)
+            tasks.take(4).forEach { task ->
+                Column(Modifier.fillMaxWidth().padding(top = 9.dp)) {
+                    Text(task.title, color = Ink, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        TextButton(onClick = { onComplete(task.id) }) { Text("Hecho", color = Leaf) }
+                        TextButton(onClick = { onTomorrow(task.id) }) { Text("Mañana", color = Coral) }
+                        TextButton(onClick = { onArchive(task.id) }) { Text("Archivar", color = MutedInk) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -638,6 +834,11 @@ private fun CaptureSheet(
     }
 }
 
+private enum class SettingsSection(val label: String) {
+    NOTICES("Avisos"), APPEARANCE("Apariencia"), ORGANIZATION("Organización"), DATA("Datos"),
+    STATS("Estadísticas"), ARCHIVE("Archivados"), TRASH("Papelera")
+}
+
 @Composable
 private fun SettingsSheet(
     onDismiss: () -> Unit,
@@ -645,6 +846,8 @@ private fun SettingsSheet(
     onImport: () -> Unit,
     viewModel: TrazoViewModel
 ) {
+    var newCategoryName by remember { mutableStateOf("") }
+    var section by remember { mutableStateOf(SettingsSection.NOTICES) }
     val state by viewModel.state
     val settings by viewModel.settings
     val stats = viewModel.focusStats()
@@ -654,22 +857,45 @@ private fun SettingsSheet(
     val activeHabits = state.habits.filter { !it.archived && it.deletedAt == null }
     val habitChecks = activeHabits.sumOf { habit -> (0L..6L).count { offset -> HabitProgress.isComplete(habit, today.minusDays(offset)) } }
     val habitDue = activeHabits.sumOf { habit -> (0L..6L).count { offset -> HabitProgress.isScheduled(habit, today.minusDays(offset)) } }
+    val taskProgress = TaskProgressInsights.from(state.tasks, today)
     val archivedTasks = state.tasks.filter { it.archived && it.deletedAt == null }
     val archivedHabits = state.habits.filter { it.archived && it.deletedAt == null }
     val deletedTasks = state.tasks.filter { it.deletedAt != null }
     val deletedHabits = state.habits.filter { it.deletedAt != null }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = Paper) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 30.dp)
+            Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())
+                .navigationBarsPadding().padding(bottom = 48.dp)
         ) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
-                Text("Ajustes", style = MaterialTheme.typography.headlineMedium)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Ajustes", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onDismiss) { Text("Cerrar", color = Coral) }
+                }
                 Text(
                     "Personaliza tu experiencia, revisa tu avance y cuida tus datos.",
                     color = MutedInk,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                SettingsSection.entries.forEach { item ->
+                    val selected = section == item
+                    Surface(
+                        onClick = { section = item },
+                        color = if (selected) Ink else PaperRaised,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.semantics { contentDescription = "${item.label}, ${if (selected) "seleccionado" else "no seleccionado"}" }
+                    ) {
+                        Text(item.label, color = if (selected) Paper else MutedInk, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp))
+                    }
+                }
+            }
+            if (section == SettingsSection.NOTICES) {
             Text(
                 "NOTIFICACIONES",
                 color = Coral,
@@ -679,6 +905,8 @@ private fun SettingsSheet(
                 modifier = Modifier.padding(start = 24.dp, top = 8.dp)
             )
             ReminderCard(state)
+            }
+            if (section == SettingsSection.APPEARANCE) {
             Text("APARIENCIA Y ACCESIBILIDAD", color = Lavender, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Lavender.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
@@ -691,12 +919,78 @@ private fun SettingsSheet(
                             }
                         }
                     }
+                    Text("Diseño de Hoy", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TodayLayout.entries.forEach { layout ->
+                            val selected = settings.todayLayout == layout
+                            TextButton(
+                                onClick = { viewModel.updateSettings(settings.copy(todayLayout = layout)) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    when (layout) { TodayLayout.FOCUS -> "Enfoque"; TodayLayout.BALANCED -> "Equilibrado"; TodayLayout.OVERVIEW -> "Panorama" },
+                                    color = if (selected) Coral else MutedInk,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
                     SettingsToggle("Texto más grande", settings.largeText) { viewModel.updateSettings(settings.copy(largeText = it)) }
                     SettingsToggle("Minimalista blanco y negro", settings.minimalMode) { viewModel.updateSettings(settings.copy(minimalMode = it)) }
                     SettingsToggle("Reducir animaciones", settings.reducedMotion) { viewModel.updateSettings(settings.copy(reducedMotion = it)) }
                     SettingsToggle("Respuesta háptica", settings.haptics) { viewModel.updateSettings(settings.copy(haptics = it)) }
                 }
             }
+            }
+            if (section == SettingsSection.ORGANIZATION) {
+            Text("ORGANIZACIÓN", color = Leaf, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
+            Surface(color = Leaf.copy(alpha = .09f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("Categorías compartidas", fontWeight = FontWeight.Bold)
+                    Text("Se usan en tareas, hábitos y plantillas.", color = MutedInk, fontSize = 11.sp)
+                    state.categories.forEach { category ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("${category.symbol} ${category.name}", modifier = Modifier.weight(1f), color = Ink)
+                            if (category.id != "general") TextButton(onClick = { viewModel.deleteCategory(category.id) }) { Text("Eliminar", color = Coral, fontSize = 11.sp) }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(newCategoryName, { newCategoryName = it }, label = { Text("Nueva categoría") }, singleLine = true, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { viewModel.addCategory(newCategoryName); newCategoryName = "" }, enabled = newCategoryName.isNotBlank()) { Text("Añadir") }
+                    }
+                    if (state.taskTemplates.isNotEmpty()) {
+                        Text("Plantillas de tarea", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+                        state.taskTemplates.forEach { template ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("✦ ${template.name}", modifier = Modifier.weight(1f))
+                                TextButton(onClick = { viewModel.deleteTaskTemplate(template.id) }) { Text("Eliminar", color = Coral, fontSize = 11.sp) }
+                            }
+                        }
+                    }
+                }
+            }
+            Text("REVISIÓN NOCTURNA", color = Lavender, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
+            Surface(color = Lavender.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    SettingsToggle("Mostrar cierre del día", settings.nightReviewEnabled) {
+                        viewModel.updateSettings(settings.copy(nightReviewEnabled = it))
+                    }
+                    Text("Hora de aparición", color = MutedInk, fontSize = 12.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf(18, 20, 21, 22).forEach { hour ->
+                            val selected = settings.nightReviewHour == hour
+                            TextButton(
+                                onClick = { viewModel.updateSettings(settings.copy(nightReviewHour = hour)) },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("%02d:00".format(hour), color = if (selected) Coral else MutedInk, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
+                        }
+                    }
+                    Text("Aparece en Hoy para completar, pasar a mañana o archivar pendientes.", color = MutedInk, fontSize = 11.sp)
+                }
+            }
+            }
+            if (section == SettingsSection.STATS) {
             Text("ESTADÍSTICAS · ÚLTIMOS 7 DÍAS", color = Mustard, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Mustard.copy(alpha = .12f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceAround) {
@@ -706,7 +1000,20 @@ private fun SettingsSheet(
                     StatCell(stats.minutes.toString(), "minutos")
                 }
             }
-            Text("ARCHIVADAS", color = Sky, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
+            Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 3.dp).fillMaxWidth()) {
+                Row(Modifier.padding(15.dp), horizontalArrangement = Arrangement.SpaceAround) {
+                    StatCell(taskProgress.openTasks.toString(), "pendientes")
+                    StatCell(taskProgress.scheduledThisWeek.toString(), "esta semana")
+                    StatCell(taskProgress.overdueTasks.toString(), "atrasadas")
+                    StatCell(
+                        if (taskProgress.totalSubtasks == 0) "—" else "${taskProgress.checklistPercent}%",
+                        "checklist"
+                    )
+                }
+            }
+            }
+            if (section == SettingsSection.ARCHIVE) {
+            Text("ARCHIVADAS · ${archivedTasks.size + archivedHabits.size}", color = Sky, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 12.dp))
             Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
                     Text("Se conservan completas, pero dejan de aparecer en tus listas.", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -716,7 +1023,9 @@ private fun SettingsSheet(
                     }
                 }
             }
-            Text("PAPELERA", color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 8.dp))
+            }
+            if (section == SettingsSection.TRASH) {
+            Text("PAPELERA · ${deletedTasks.size + deletedHabits.size}", color = Coral, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, fontSize = 12.sp, modifier = Modifier.padding(start = 24.dp, top = 8.dp))
             Surface(color = Coral.copy(alpha = .08f), shape = RoundedCornerShape(15.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
                     Text("Aquí quedan los elementos borrados hasta que decidas restaurarlos o eliminarlos para siempre.", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -730,6 +1039,8 @@ private fun SettingsSheet(
                     }
                 }
             }
+            }
+            if (section == SettingsSection.DATA) {
             Text(
                 "DATOS LOCALES",
                 color = Leaf,
@@ -739,6 +1050,8 @@ private fun SettingsSheet(
                 modifier = Modifier.padding(start = 24.dp, top = 12.dp)
             )
             LocalDataCard(onExport, onImport)
+            }
+        }
         }
     }
 }
@@ -1109,25 +1422,18 @@ private fun ReminderTimeRow(
 @Composable
 private fun TasksScreen(
     tasks: List<Task>, padding: PaddingValues, onToggle: (String) -> Unit,
+    onSubtaskToggle: (String, String) -> Unit,
     onDelete: (String) -> Unit, onDateChange: (String, LocalDate?) -> Unit,
     onEdit: (Task) -> Unit, onArchive: (String) -> Unit
 ) {
-    var filter by remember { mutableStateOf(TaskFilter.OPEN) }
+    var filters by remember { mutableStateOf(TaskFilterSelection()) }
     var query by remember { mutableStateOf("") }
     val today = LocalDate.now()
-    val visible = tasks.filter {
-        (query.isBlank() || it.title.contains(query, true) || it.note.contains(query, true) || it.tags.any { tag -> tag.contains(query, true) }) &&
-        when (filter) {
-            TaskFilter.OPEN -> !it.completed
-            TaskFilter.TODAY -> !it.completed && (it.dueDate == null || !it.dueDate.isAfter(today))
-            TaskFilter.DONE -> it.completed
-            TaskFilter.ALL -> true
-        }
-    }.sortedWith(compareBy<Task> { it.completed }.thenBy { it.dueDate ?: LocalDate.MAX }.thenByDescending { it.priority })
+    val visible = TaskFiltering.apply(tasks, query, filters, today)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
         item { PageHeader("Lista flexible", "Tus tareas", "Ordena sin perder la calma.") }
         item { SearchField(query, { query = it }, "Buscar tareas o #etiquetas") }
-        item { TaskFilters(filter) { filter = it } }
+        item { TaskFilters(filters) { filters = it } }
         if (visible.isEmpty()) item {
             EmptyNote(
                 if (tasks.isEmpty()) "La hoja está limpia" else "Nada por aquí",
@@ -1138,32 +1444,72 @@ private fun TasksScreen(
         }
         items(visible, key = { it.id }) {
             Box(Modifier.animateItem()) {
-                TaskCard(it, onToggle, onDelete, { date -> onDateChange(it.id, date) }, { onEdit(it) }, { onArchive(it.id) })
+                TaskCard(it, onToggle, onDelete, { date -> onDateChange(it.id, date) }, { onEdit(it) }, { onArchive(it.id) }, onSubtaskToggle)
             }
         }
     }
 }
 
 @Composable
-private fun TaskFilters(selected: TaskFilter, onSelect: (TaskFilter) -> Unit) {
+private fun TaskFilters(selected: TaskFilterSelection, onSelect: (TaskFilterSelection) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
+        val defaults = TaskFilterSelection()
+        val activeCount = listOf(selected.status != defaults.status, selected.date != defaults.date, selected.priority != defaults.priority).count { it }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (activeCount == 0) "Filtros" else "$activeCount filtros activos", color = MutedInk, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            if (activeCount > 0) TextButton(onClick = { onSelect(defaults) }) { Text("Limpiar", color = Coral, fontSize = 12.sp) }
+        }
+        FilterRow(
+            options = TaskStatusFilter.entries.toList(),
+            selected = selected.status,
+            onSelect = { onSelect(selected.copy(status = it)) }
+        )
+        FilterRow(
+            options = TaskDateFilter.entries.toList(),
+            selected = selected.date,
+            onSelect = { onSelect(selected.copy(date = it)) }
+        )
+        FilterRow(
+            options = TaskPriorityFilter.entries.toList(),
+            selected = selected.priority,
+            onSelect = { onSelect(selected.copy(priority = it)) }
+        )
+    }
+}
+
+private interface LabeledFilter { val label: String }
+private val TaskStatusFilter.filterLabel get() = label
+private val TaskDateFilter.filterLabel get() = label
+private val TaskPriorityFilter.filterLabel get() = label
+
+@Composable
+private fun <T> FilterRow(options: List<T>, selected: T, onSelect: (T) -> Unit) where T : Enum<T> {
+    val labels = options.associateWith {
+        when (it) {
+            is TaskStatusFilter -> it.filterLabel
+            is TaskDateFilter -> it.filterLabel
+            is TaskPriorityFilter -> it.filterLabel
+            else -> it.name
+        }
+    }
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        TaskFilter.entries.forEach { filter ->
+        options.forEach { option ->
+            val isSelected = option == selected
             Surface(
-                onClick = { onSelect(filter) },
-                color = if (filter == selected) Ink else Color.Transparent,
+                onClick = { onSelect(option) },
+                color = if (isSelected) Ink else PaperRaised,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.sketchBorder(Ink.copy(alpha = if (isSelected) .14f else .08f))
             ) {
                 Text(
-                    filter.label,
-                    color = if (filter == selected) Paper else MutedInk,
+                    labels.getValue(option),
+                    color = if (isSelected) Paper else MutedInk,
                     fontSize = 12.sp,
-                    fontWeight = if (filter == selected) FontWeight.Bold else FontWeight.Medium,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 9.dp)
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                 )
             }
         }
@@ -1177,15 +1523,43 @@ private fun HabitsScreen(
     onArchive: (String) -> Unit, onAdjust: (String, Int) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    val visible = habits.filter { query.isBlank() || it.title.contains(query, true) || it.category.label.contains(query, true) || it.tags.any { tag -> tag.contains(query, true) } }
+    var categoryFilter by remember { mutableStateOf<String?>(null) }
+    var todayOnly by remember { mutableStateOf(false) }
+    val today = LocalDate.now()
+    val categories = habits.map { it.category.label }.distinct().sorted()
+    val activeFilters = (if (categoryFilter != null) 1 else 0) + (if (todayOnly) 1 else 0)
+    val visible = habits.filter {
+        (query.isBlank() || it.title.contains(query, true) || it.category.label.contains(query, true) || it.tags.any { tag -> tag.contains(query, true) }) &&
+            (categoryFilter == null || it.category.label == categoryFilter) &&
+            (!todayOnly || HabitProgress.isScheduled(it, today))
+    }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 96.dp)) {
         item { PageHeader("Pequeños trazos", "Tus hábitos", "No busques perfección; vuelve mañana.") }
         item { SearchField(query, { query = it }, "Buscar hábitos o #etiquetas") }
+        item {
+            Column(Modifier.fillMaxWidth().padding(bottom = 5.dp)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (activeFilters == 0) "Filtros" else "$activeFilters filtros activos", color = MutedInk, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    if (activeFilters > 0) TextButton(onClick = { categoryFilter = null; todayOnly = false }) { Text("Limpiar", color = Coral, fontSize = 12.sp) }
+                }
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChipLabel("Programados hoy", todayOnly) { todayOnly = !todayOnly }
+                    categories.forEach { category -> FilterChipLabel(category, categoryFilter == category) { categoryFilter = category.takeUnless { it == categoryFilter } } }
+                }
+            }
+        }
         if (visible.isNotEmpty()) item { HabitSummary(visible) }
         if (visible.isEmpty()) item { EmptyNote("Aún sin rituales", "Agrega un hábito amable y sostenible.", null, R.drawable.widget_ai_ritual) }
         items(visible, key = { it.id }) {
             Box(Modifier.animateItem()) { HabitCard(it, onToggle, onDelete, { onEdit(it) }, { delta -> onAdjust(it.id, delta) }, { onArchive(it.id) }) }
         }
+    }
+}
+
+@Composable
+private fun FilterChipLabel(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, color = if (selected) Ink else PaperRaised, shape = RoundedCornerShape(14.dp)) {
+        Text(label, color = if (selected) Paper else MutedInk, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp))
     }
 }
 
@@ -1281,7 +1655,8 @@ private fun SectionTitle(title: String, note: String) {
 private fun TaskCard(
     task: Task, onToggle: (String) -> Unit, onDelete: ((String) -> Unit)?,
     onDateChange: ((LocalDate?) -> Unit)? = null, onEdit: (() -> Unit)? = null,
-    onArchive: (() -> Unit)? = null
+    onArchive: (() -> Unit)? = null,
+    onSubtaskToggle: ((String, String) -> Unit)? = null
 ) {
     val reducedMotion = LocalReducedMotion.current
     val minimalMode = LocalMinimalMode.current
@@ -1313,6 +1688,10 @@ private fun TaskCard(
                     )
                     if (task.note.isNotBlank()) Text(task.note, color = MutedInk, fontSize = 13.sp, maxLines = 2)
                     if (task.tags.isNotEmpty()) Text(task.tags.joinToString("  ") { "#$it" }, color = Lavender, fontSize = 11.sp, maxLines = 1)
+                    Text(
+                        "≈ ${if (task.durationMinutes >= 60) "${task.durationMinutes / 60} h" else "${task.durationMinutes} min"}",
+                        color = MutedInk, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp)
+                    )
                     task.dueDate?.let { date ->
                         val today = LocalDate.now()
                         val label = when (date) {
@@ -1328,6 +1707,7 @@ private fun TaskCard(
                 }
                 if (task.priority == TaskPriority.IMPORTANT && !task.completed) Text("!", color = Coral, fontWeight = FontWeight.Black, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
             }
+            onSubtaskToggle?.let { TaskChecklist(task, it) }
             if (onEdit != null || onDateChange != null || onArchive != null || onDelete != null) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 56.dp, end = 8.dp, bottom = 7.dp),
@@ -1340,6 +1720,54 @@ private fun TaskCard(
                     if (onDelete != null) DeleteButton("tarea") { onDelete(task.id) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun TaskChecklist(
+    task: Task,
+    onSubtaskToggle: (String, String) -> Unit,
+    compact: Boolean = false
+) {
+    if (task.subtasks.isEmpty()) return
+    val completed = task.subtasks.count { it.completed }
+    val visibleItems = if (compact) task.subtasks.take(2) else task.subtasks
+    Column(Modifier.fillMaxWidth().padding(start = 58.dp, end = 14.dp, bottom = 8.dp)) {
+        Text(
+            "$completed / ${task.subtasks.size} pasos",
+            color = if (completed == task.subtasks.size) Leaf else MutedInk,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
+        visibleItems.forEach { subtask ->
+            val dependency = subtask.dependsOnId?.let { id -> task.subtasks.firstOrNull { it.id == id } }
+            val blocked = dependency != null && !dependency.completed && !subtask.completed
+            Row(
+                Modifier.fillMaxWidth().clickable(enabled = !blocked) { onSubtaskToggle(task.id, subtask.id) }.padding(vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = subtask.completed,
+                    onCheckedChange = { onSubtaskToggle(task.id, subtask.id) },
+                    enabled = !blocked,
+                    colors = CheckboxDefaults.colors(checkedColor = Leaf),
+                    modifier = Modifier.size(30.dp)
+                )
+                Column(Modifier.padding(start = 5.dp)) {
+                    Text(
+                        subtask.title,
+                        color = if (subtask.completed || blocked) MutedInk else Ink,
+                        textDecoration = if (subtask.completed) TextDecoration.LineThrough else null,
+                        fontSize = 13.sp
+                    )
+                    if (blocked) Text("↳ Bloqueada hasta completar «${dependency?.title}»", color = Coral, fontSize = 10.sp)
+                }
+            }
+        }
+        if (compact && task.subtasks.size > visibleItems.size) {
+            Text("+ ${task.subtasks.size - visibleItems.size} pasos", color = MutedInk, fontSize = 11.sp)
         }
     }
 }
@@ -1591,31 +2019,174 @@ private fun SketchNavigation(selected: Section, onSelect: (Section) -> Unit) {
 }
 
 @Composable
-private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?, onDismiss: () -> Unit, onSave: (TaskInput) -> Unit) {
+private fun TaskComposer(
+    task: Task?, draft: TaskInput?, initialDate: LocalDate?,
+    categories: List<CategoryDefinition>, templates: List<TaskTemplate>,
+    advancedInitially: Boolean, onAdvancedChanged: (Boolean) -> Unit,
+    onDismiss: () -> Unit, onSaveTemplate: (String, TaskInput) -> Unit,
+    onSave: (TaskInput) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var title by remember(task, draft) { mutableStateOf(task?.title ?: draft?.title.orEmpty()) }
     var note by remember(task, draft) { mutableStateOf(task?.note ?: draft?.note.orEmpty()) }
     var important by remember(task, draft) { mutableStateOf(task?.priority == TaskPriority.IMPORTANT || draft?.important == true) }
     var dueDate by remember(task, draft, initialDate) { mutableStateOf(task?.dueDate ?: draft?.dueDate ?: initialDate) }
+    var durationMinutes by remember(task, draft) { mutableIntStateOf(task?.durationMinutes ?: draft?.durationMinutes ?: 25) }
+    var recurrence by remember(task, draft) { mutableStateOf(task?.recurrence ?: draft?.recurrence ?: TaskRecurrence.NONE) }
+    var categoryId by remember(task, draft) { mutableStateOf(task?.categoryId ?: draft?.categoryId ?: "general") }
+    val initialSubtasks = task?.subtasks ?: draft?.subtasks.orEmpty()
+    var subtasks by remember(task, draft) { mutableStateOf(initialSubtasks) }
+    var subtasksText by remember(task, draft) { mutableStateOf(initialSubtasks.joinToString("\n") { it.title }) }
     var reminderHour by remember(task, draft) { mutableStateOf(task?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(task, draft) { mutableIntStateOf(task?.reminderMinute ?: draft?.reminderMinute ?: 0) }
+    var reminderMode by remember(task, draft) { mutableStateOf(task?.reminderMode ?: draft?.reminderMode) }
+    var criticalAlarm by remember(task, draft) { mutableStateOf(task?.criticalAlarm ?: draft?.criticalAlarm ?: false) }
     var reminderText by remember(task, draft) { mutableStateOf((task?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, task?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
     var tags by remember(task, draft) { mutableStateOf((task?.tags ?: draft?.tags.orEmpty()).joinToString(", ")) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var advanced by remember(task) { mutableStateOf(task != null || advancedInitially) }
     val focusManager = LocalFocusManager.current
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper, sheetState = sheetState) {
         ComposerLayout(if (task == null) "Nueva tarea" else "Editar tarea", if (task == null) "Sácala de tu cabeza y déjala aquí." else "Ajusta lo que necesites.") {
+            if (task == null) {
+                Text("Plantillas", color = MutedInk, fontSize = 12.sp)
+                if (templates.isEmpty()) {
+                    Text("Aún no hay plantillas. Completa esta tarea y usa «Guardar configuración como plantilla».", color = MutedInk, fontSize = 10.sp, modifier = Modifier.padding(vertical = 5.dp))
+                } else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    templates.forEach { template ->
+                        Surface(onClick = {
+                            title = template.title; note = template.note
+                            important = template.priority == TaskPriority.IMPORTANT
+                            durationMinutes = template.durationMinutes; recurrence = template.recurrence
+                            categoryId = template.categoryId
+                            subtasks = cloneTemplateSubtasks(template.subtasks)
+                            subtasksText = subtasks.joinToString("\n") { it.title }
+                            reminderHour = template.reminderHour; reminderMinute = template.reminderMinute
+                            reminderMode = template.reminderMode; tags = template.tags.joinToString(", ")
+                            reminderText = template.reminderHour?.let { "%02d:%02d".format(it, template.reminderMinute) }.orEmpty()
+                        }, color = Leaf.copy(alpha = .12f), shape = RoundedCornerShape(12.dp)) {
+                            Text("✦ ${template.name}", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = Ink)
+                        }
+                    }
+                }
+            }
             OutlinedTextField(
                 value = title, onValueChange = { title = it }, label = { Text("¿Qué quieres hacer?") },
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
+            Surface(color = Leaf.copy(alpha = .08f), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Plan rápido", color = Leaf, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf(15, 25, 45, 60).forEach { minutes ->
+                            TimeChoice(if (minutes == 60) "1 h" else "$minutes min", durationMinutes == minutes) { durationMinutes = minutes }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        DateChoice("Sin fecha", dueDate == null) { dueDate = null }
+                        DateChoice("Hoy", dueDate == LocalDate.now()) { dueDate = LocalDate.now() }
+                        DateChoice("Mañana", dueDate == LocalDate.now().plusDays(1)) { dueDate = LocalDate.now().plusDays(1) }
+                    }
+                }
+            }
+            TextButton(onClick = { advanced = !advanced; onAdvancedChanged(advanced) }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (advanced) "Ocultar opciones avanzadas ↑" else "Más opciones ↓", color = Coral, fontWeight = FontWeight.Bold)
+            }
+            AnimatedVisibility(advanced) {
+            Column {
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = note, onValueChange = { note = it }, label = { Text("Una nota (opcional)") },
+                OutlinedTextField(
+                    value = note, onValueChange = { note = it }, label = { Text("Una nota (opcional)") },
                 modifier = Modifier.fillMaxWidth(), maxLines = 3,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
-            )
+                )
+                if (subtasks.size < 2) Text("Añade al menos dos subtareas para configurar dependencias.", color = MutedInk, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                Text("Categoría", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    categories.forEach { category ->
+                        val selected = category.id == categoryId
+                        Surface(onClick = { categoryId = category.id }, color = if (selected) Leaf else Ink.copy(alpha = .05f), shape = RoundedCornerShape(10.dp)) {
+                            Text("${category.symbol} ${category.name}", color = if (selected) Color.White else Ink, modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp), fontSize = 11.sp)
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = subtasksText, onValueChange = { value ->
+                        subtasksText = value
+                        subtasks = reconcileComposerSubtasks(value, subtasks)
+                    },
+                    label = { Text("Subtareas (una por línea)") },
+                    placeholder = { Text("Preparar materiales\nRevisar resultado") },
+                    minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                )
+                if (subtasks.size > 1) {
+                    Text("Dependencias", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 9.dp))
+                    Text("Toca cada relación para cambiar qué paso debe terminar primero.", color = MutedInk, fontSize = 10.sp)
+                    subtasks.drop(1).forEachIndexed { offset, subtask ->
+                        val index = offset + 1
+                        val candidates = listOf<TaskSubtask?>(null) + subtasks.take(index)
+                        val selectedIndex = candidates.indexOfFirst { it?.id == subtask.dependsOnId }.coerceAtLeast(0)
+                        val dependency = candidates[selectedIndex]
+                        Surface(
+                            onClick = {
+                                val next = candidates[(selectedIndex + 1) % candidates.size]
+                                subtasks = subtasks.map { if (it.id == subtask.id) it.copy(dependsOnId = next?.id) else it }
+                            },
+                            color = if (dependency == null) Ink.copy(alpha = .05f) else Coral.copy(alpha = .10f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 5.dp)
+                        ) {
+                            Column(Modifier.padding(horizontal = 11.dp, vertical = 8.dp)) {
+                                Text(subtask.title, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                Text(dependency?.let { "↳ Después de: ${it.title}" } ?: "↳ Sin dependencia", color = if (dependency == null) MutedInk else Coral, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+                Text("Duración estimada", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(15, 25, 45, 60, 90).forEach { minutes ->
+                        val selected = durationMinutes == minutes
+                        Surface(
+                            onClick = { durationMinutes = minutes },
+                            color = if (selected) Coral else PaperRaised.copy(alpha = .72f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                if (minutes >= 60) "${minutes / 60} h" else "$minutes min",
+                                color = if (selected) Color.White else Ink,
+                                fontSize = 11.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+                Text("Repetición", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf(
+                        TaskRecurrence.NONE to "Nunca",
+                        TaskRecurrence.DAILY to "Diaria",
+                        TaskRecurrence.WEEKLY to "Semanal",
+                        TaskRecurrence.MONTHLY to "Mensual"
+                    ).forEach { (value, label) ->
+                        val selected = recurrence == value
+                        Surface(
+                            onClick = { recurrence = value },
+                            color = if (selected) Leaf else PaperRaised.copy(alpha = .72f),
+                            shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f)
+                        ) {
+                            Text(label, color = if (selected) Color.White else Ink, fontSize = 10.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                    }
+                }
             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { important = !important }.padding(vertical = 8.dp),
@@ -1659,9 +2230,26 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
                 }
             }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
             ReminderReadinessNote(reminderHour != null)
+            if (reminderHour != null) {
+                ItemReminderModePicker(reminderMode) { reminderMode = it }
+                SettingsToggle("Alarma crítica · pantalla completa", criticalAlarm) { criticalAlarm = it }
+            }
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+            if (task == null && title.isNotBlank()) {
+                TextButton(onClick = {
+                    onSaveTemplate(title, TaskInput(title, note, important, dueDate, durationMinutes, recurrence, categoryId,
+                        subtasks,
+                        reminderHour, reminderMinute, reminderMode, criticalAlarm, parseTags(tags)))
+                }, modifier = Modifier.fillMaxWidth()) { Text("Guardar configuración como plantilla", color = Leaf) }
+            }
+            }
+            }
             SaveButton(if (task == null) "Guardar tarea" else "Guardar cambios", title.isNotBlank()) {
-                onSave(TaskInput(title, note, important, dueDate, reminderHour, reminderMinute, parseTags(tags)))
+                onSave(TaskInput(title = title, note = note, important = important, dueDate = dueDate,
+                    durationMinutes = durationMinutes, recurrence = recurrence, categoryId = categoryId, reminderHour = reminderHour,
+                    reminderMinute = reminderMinute, reminderMode = reminderMode.takeIf { reminderHour != null }, tags = parseTags(tags),
+                    criticalAlarm = criticalAlarm && reminderHour != null,
+                    subtasks = subtasks))
             }
         }
     }
@@ -1682,10 +2270,67 @@ private fun TaskComposer(task: Task?, draft: TaskInput?, initialDate: LocalDate?
     }
 }
 
+private fun reconcileComposerSubtasks(text: String, previous: List<TaskSubtask>): List<TaskSubtask> {
+    val titles = text.lines().mapNotNull { it.trim().takeIf(String::isNotBlank) }
+    val updated = titles.mapIndexed { index, title ->
+        previous.getOrNull(index)?.copy(title = title) ?: TaskSubtask(title = title)
+    }
+    val validIds = updated.mapTo(mutableSetOf()) { it.id }
+    return updated.map { if (it.dependsOnId in validIds) it else it.copy(dependsOnId = null) }
+}
+
+private fun cloneTemplateSubtasks(source: List<TaskSubtask>): List<TaskSubtask> {
+    val newIds = source.associate { it.id to java.util.UUID.randomUUID().toString() }
+    return source.map { subtask ->
+        subtask.copy(
+            id = newIds.getValue(subtask.id),
+            completed = false,
+            dependsOnId = subtask.dependsOnId?.let(newIds::get)
+        )
+    }
+}
+
 @Composable
 private fun RowScope.TimeChoice(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(onClick = onClick, color = if (selected) Leaf else Ink.copy(alpha = .05f), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f)) {
         Text(label, color = if (selected) Color.White else MutedInk, fontSize = 10.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(vertical = 8.dp))
+    }
+}
+
+/** Lets an item override the global reminder style without hiding the default. */
+@Composable
+private fun ItemReminderModePicker(selected: ItemReminderMode?, onSelected: (ItemReminderMode?) -> Unit) {
+    val options = listOf(
+        null to "Según ajustes",
+        ItemReminderMode.NOTIFICATION to "Aviso",
+        ItemReminderMode.EARLY_ALARM to "Previa",
+        ItemReminderMode.ON_TIME_ALARM to "En hora",
+        ItemReminderMode.BOTH_ALARMS to "Ambas"
+    )
+    Text("Cómo avisarte", color = MutedInk, fontSize = 12.sp, modifier = Modifier.padding(top = 9.dp, bottom = 4.dp))
+    options.chunked(3).forEach { row ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            row.forEach { (mode, label) ->
+                val active = mode == selected
+                Surface(
+                    onClick = { onSelected(mode) },
+                    color = if (active) Coral else Ink.copy(alpha = .05f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        label,
+                        color = if (active) Color.White else MutedInk,
+                        fontSize = 10.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            }
+            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+        }
+        Spacer(Modifier.height(5.dp))
     }
 }
 
@@ -1701,9 +2346,13 @@ private fun RowScope.DateChoice(label: String, selected: Boolean, onClick: () ->
 private fun HabitComposer(
     habit: Habit?,
     draft: HabitInput?,
+    advancedInitially: Boolean,
+    onAdvancedChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onSave: (HabitInput) -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var advanced by remember(habit) { mutableStateOf(habit != null || advancedInitially) }
     var title by remember(habit, draft) { mutableStateOf(habit?.title ?: draft?.title.orEmpty()) }
     var emoji by remember(habit, draft) { mutableStateOf(habit?.emoji ?: draft?.emoji ?: "✦") }
     var category by remember(habit, draft) { mutableStateOf(habit?.category ?: draft?.category ?: HabitCategory.GENERAL) }
@@ -1715,13 +2364,15 @@ private fun HabitComposer(
     var unit by remember(habit, draft) { mutableStateOf(habit?.unit ?: draft?.unit ?: HabitUnit.CHECK) }
     var reminderHour by remember(habit, draft) { mutableStateOf(habit?.reminderHour ?: draft?.reminderHour) }
     var reminderMinute by remember(habit, draft) { mutableIntStateOf(habit?.reminderMinute ?: draft?.reminderMinute ?: 0) }
+    var reminderMode by remember(habit, draft) { mutableStateOf(habit?.reminderMode ?: draft?.reminderMode) }
+    var criticalAlarm by remember(habit, draft) { mutableStateOf(habit?.criticalAlarm ?: draft?.criticalAlarm ?: false) }
     var reminderText by remember(habit, draft) { mutableStateOf((habit?.reminderHour ?: draft?.reminderHour)?.let { "%02d:%02d".format(it, habit?.reminderMinute ?: draft?.reminderMinute ?: 0) }.orEmpty()) }
     var tags by remember(habit, draft) { mutableStateOf((habit?.tags ?: draft?.tags.orEmpty()).joinToString(", ")) }
     val labels = mapOf(
         DayOfWeek.MONDAY to "L", DayOfWeek.TUESDAY to "M", DayOfWeek.WEDNESDAY to "X",
         DayOfWeek.THURSDAY to "J", DayOfWeek.FRIDAY to "V", DayOfWeek.SATURDAY to "S", DayOfWeek.SUNDAY to "D"
     )
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Paper, sheetState = sheetState) {
         ComposerLayout(if (habit == null) "Nuevo hábito" else "Editar hábito", if (habit == null) "Hazlo tan pequeño que dé gusto volver." else "Haz que siga encajando en tu vida.") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(emoji, { emoji = it.take(2) }, label = { Text("Símbolo") }, singleLine = true, modifier = Modifier.width(94.dp))
@@ -1781,6 +2432,15 @@ private fun HabitComposer(
                     ) { Text(labels.getValue(day), color = if (active) Color.White else Ink, fontWeight = FontWeight.Bold) }
                 }
             }
+            if (days.isEmpty()) Text("Elige al menos un día", color = Coral, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            TextButton(
+                onClick = { advanced = !advanced; onAdvancedChanged(advanced) },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            ) {
+                Text(if (advanced) "Ocultar opciones avanzadas ↑" else "Más opciones ↓", color = Leaf, fontWeight = FontWeight.Bold)
+            }
+            AnimatedVisibility(advanced) {
+                Column {
             Text("Frecuencia", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 7.dp))
             Surface(color = Sky.copy(alpha = .10f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1824,7 +2484,13 @@ private fun HabitComposer(
                 parsed?.let { (h, m) -> reminderHour = h; reminderMinute = m }
             }, label = { Text("Hora personalizada (HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
             ReminderReadinessNote(reminderHour != null)
+            if (reminderHour != null) {
+                ItemReminderModePicker(reminderMode) { reminderMode = it }
+                SettingsToggle("Alarma crítica · pantalla completa", criticalAlarm) { criticalAlarm = it }
+            }
             OutlinedTextField(tags, { tags = it }, label = { Text("Etiquetas separadas por coma") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                }
+            }
             Spacer(Modifier.height(22.dp))
             SaveButton(if (habit == null) "Crear hábito" else "Guardar cambios", title.isNotBlank() && days.isNotEmpty()) {
                 onSave(HabitInput(
@@ -1833,6 +2499,8 @@ private fun HabitComposer(
                     skippedDates = skippedDates,
                     target = target, unit = unit,
                     reminderHour = reminderHour, reminderMinute = reminderMinute,
+                    reminderMode = reminderMode.takeIf { reminderHour != null },
+                    criticalAlarm = criticalAlarm && reminderHour != null,
                     tags = parseTags(tags)
                 ))
             }
@@ -1915,7 +2583,10 @@ private fun parseReminder(value: String): Pair<Int, Int>? {
 
 @Composable
 private fun ComposerLayout(title: String, subtitle: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
+    Column(
+        Modifier.fillMaxWidth().fillMaxHeight(.94f).verticalScroll(rememberScrollState())
+            .imePadding().navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 88.dp)
+    ) {
         Text(title, style = MaterialTheme.typography.headlineMedium)
         Text(subtitle, color = MutedInk, modifier = Modifier.padding(bottom = 18.dp))
         content()

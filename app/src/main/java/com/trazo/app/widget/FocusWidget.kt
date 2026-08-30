@@ -28,10 +28,11 @@ class FocusWidget : AppWidgetProvider() {
             val session = FocusSessionStore.load(context)
             if (session == null) {
                 val task = LocalStore(context).load().tasks.firstOrNull { !it.completed && !it.archived && it.deletedAt == null }
+                val durationSeconds = (task?.durationMinutes ?: 25).coerceIn(1, 180) * 60
                 ContextCompat.startForegroundService(
                     context,
                     Intent(context, FocusTimerService::class.java).apply {
-                        putExtra(FocusTimerService.EXTRA_END_AT, System.currentTimeMillis() + DEFAULT_FOCUS_SECONDS * 1000L)
+                        putExtra(FocusTimerService.EXTRA_END_AT, System.currentTimeMillis() + durationSeconds * 1000L)
                         putExtra(FocusTimerService.EXTRA_TASK, task?.title)
                         putExtra(FocusTimerService.EXTRA_PHASE, "FOCUS")
                     }
@@ -43,14 +44,15 @@ class FocusWidget : AppWidgetProvider() {
                         .putExtra(FocusTimerService.EXTRA_RESET_UI, true)
                 )
             }
+            // Reflect the new session immediately instead of waiting for the
+            // periodic widget refresh.
+            updateAll(context)
         }
         super.onReceive(context, intent)
     }
 
     companion object {
         private const val ACTION_TOGGLE_FOCUS = "com.trazo.app.widget.TOGGLE_FOCUS"
-        private const val DEFAULT_FOCUS_SECONDS = 25 * 60
-
         fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, FocusWidget::class.java)
@@ -69,6 +71,10 @@ class FocusWidget : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.focus_widget_idle_time, open)
                 setOnClickPendingIntent(R.id.focus_widget_action, toggleFocus(context, widgetId))
                 setTextViewText(R.id.focus_widget_phase, if (session?.phase == "BREAK") "DESCANSO" else "MODO ENFOQUE")
+                setImageViewResource(
+                    R.id.focus_widget_art,
+                    if (session?.phase == "BREAK") R.drawable.pomodoro_ai_cup else R.drawable.widget_tomato
+                )
                 setTextViewText(
                     R.id.focus_widget_task,
                     session?.taskTitle ?: nextTask?.title ?: "Un trazo a la vez"
@@ -76,14 +82,16 @@ class FocusWidget : AppWidgetProvider() {
                 if (session == null) {
                     setViewVisibility(R.id.focus_widget_timer, View.GONE)
                     setViewVisibility(R.id.focus_widget_idle_time, View.VISIBLE)
-                    setTextViewText(R.id.focus_widget_action, "▶  Iniciar 25 min")
+                    val minutes = nextTask?.durationMinutes?.coerceIn(1, 180) ?: 25
+                    setTextViewText(R.id.focus_widget_idle_time, "%02d:00".format(minutes))
+                    setTextViewText(R.id.focus_widget_action, "▶  $minutes min")
                 } else {
                     val base = SystemClock.elapsedRealtime() + (session.endAt - System.currentTimeMillis())
                     setViewVisibility(R.id.focus_widget_timer, View.VISIBLE)
                     setViewVisibility(R.id.focus_widget_idle_time, View.GONE)
                     setChronometer(R.id.focus_widget_timer, base, null, true)
                     setChronometerCountDown(R.id.focus_widget_timer, true)
-                    setTextViewText(R.id.focus_widget_action, "■  Detener")
+                    setTextViewText(R.id.focus_widget_action, "■  Parar")
                 }
             }
         }

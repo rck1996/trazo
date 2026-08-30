@@ -5,6 +5,19 @@ import java.time.LocalDate
 import java.util.UUID
 
 enum class TaskPriority { CALM, IMPORTANT }
+enum class TaskRecurrence { NONE, DAILY, WEEKLY, MONTHLY }
+
+/**
+ * Optional delivery override for one task or habit. A null value deliberately
+ * means "use the notification preference configured for the whole app" so
+ * backups created before per-item delivery modes remain unchanged.
+ */
+enum class ItemReminderMode {
+    NOTIFICATION,
+    EARLY_ALARM,
+    ON_TIME_ALARM,
+    BOTH_ALARMS
+}
 
 enum class HabitCategory(val label: String, val symbol: String) {
     GENERAL("General", "✦"),
@@ -38,6 +51,37 @@ enum class HabitUnit(val label: String, val shortLabel: String) {
     STEPS("pasos", "pasos")
 }
 
+/** User-editable category shared by tasks, habits, templates and focus sessions. */
+data class CategoryDefinition(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val symbol: String = "✦",
+    /** Portable ARGB value; UI layers may interpret it without storing Compose types. */
+    val colorArgb: Long = 0xFF5B7F67
+)
+
+object CategoryCatalog {
+    val defaults: List<CategoryDefinition> = HabitCategory.entries.map { legacy ->
+        CategoryDefinition(
+            id = legacy.name.lowercase(),
+            name = legacy.label,
+            symbol = legacy.symbol,
+            colorArgb = when (legacy) {
+                HabitCategory.GENERAL -> 0xFF6C665E
+                HabitCategory.HYDRATION -> 0xFF4D83A6
+                HabitCategory.SELF_CARE -> 0xFF69896D
+                HabitCategory.FOOD -> 0xFFB27B45
+                HabitCategory.MOVEMENT -> 0xFFC45F49
+                HabitCategory.REST -> 0xFF6D638E
+            }
+        )
+    }
+
+    fun legacyId(category: HabitCategory): String = category.name.lowercase()
+    fun find(categories: List<CategoryDefinition>, id: String?): CategoryDefinition =
+        categories.firstOrNull { it.id == id } ?: categories.firstOrNull() ?: defaults.first()
+}
+
 data class Task(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -47,11 +91,25 @@ data class Task(
     val completedAt: Long? = null,
     val createdOn: LocalDate = LocalDate.now(),
     val dueDate: LocalDate? = null,
+    /** Estimated effort used by Planner and Pomodoro suggestions. */
+    val durationMinutes: Int = 25,
+    val recurrence: TaskRecurrence = TaskRecurrence.NONE,
+    val categoryId: String = "general",
+    val subtasks: List<TaskSubtask> = emptyList(),
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
+    val reminderMode: ItemReminderMode? = null,
+    val criticalAlarm: Boolean = false,
     val tags: Set<String> = emptySet(),
     val archived: Boolean = false,
     val deletedAt: Long? = null
+)
+
+data class TaskSubtask(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val completed: Boolean = false,
+    val dependsOnId: String? = null
 )
 
 data class Habit(
@@ -59,6 +117,7 @@ data class Habit(
     val title: String,
     val emoji: String = "✦",
     val category: HabitCategory = HabitCategory.GENERAL,
+    val categoryId: String = CategoryCatalog.legacyId(category),
     val activeDays: Set<DayOfWeek> = DayOfWeek.entries.toSet(),
     val repeatEveryWeeks: Int = 1,
     val skippedDates: Set<LocalDate> = emptySet(),
@@ -68,15 +127,35 @@ data class Habit(
     val unit: HabitUnit = HabitUnit.CHECK,
     val reminderHour: Int? = null,
     val reminderMinute: Int = 0,
+    val reminderMode: ItemReminderMode? = null,
+    val criticalAlarm: Boolean = false,
     val tags: Set<String> = emptySet(),
     val archived: Boolean = false,
     val deletedAt: Long? = null,
     val createdOn: LocalDate = LocalDate.now()
 )
 
+data class TaskTemplate(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val title: String,
+    val note: String = "",
+    val priority: TaskPriority = TaskPriority.CALM,
+    val durationMinutes: Int = 25,
+    val recurrence: TaskRecurrence = TaskRecurrence.NONE,
+    val categoryId: String = "general",
+    val subtasks: List<TaskSubtask> = emptyList(),
+    val reminderHour: Int? = null,
+    val reminderMinute: Int = 0,
+    val reminderMode: ItemReminderMode? = null,
+    val tags: Set<String> = emptySet()
+)
+
 data class TrazoState(
     val tasks: List<Task> = emptyList(),
-    val habits: List<Habit> = emptyList()
+    val habits: List<Habit> = emptyList(),
+    val categories: List<CategoryDefinition> = CategoryCatalog.defaults,
+    val taskTemplates: List<TaskTemplate> = emptyList()
 )
 
 object HabitProgress {

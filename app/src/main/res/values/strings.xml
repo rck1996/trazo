@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_description">Tu día, hábitos y acceso al modo Enfoque</string>
+    <string name="widget_detailed_name">Trazo · Mi día</string>
     <string name="habit_widget_description">Completa tu próximo hábito sin abrir la app</string>
     <string name="focus_widget_description">Tu temporizador de enfoque y próxima tarea</string>
+    <string name="focus_widget_name">Trazo · Pomodoro</string>
     <string name="widget_focus_mode">MODO ENFOQUE</string>
     <string name="widget_default_time">25:00</string>
     <string name="widget_one_stroke">Un trazo a la vez</string>
@@ -25,6 +27,7 @@
     <string name="habit_list_widget_empty">Hoy el jardín descansa ✦</string>
     <string name="habit_list_widget_footer">Abrir mis hábitos →</string>
     <string name="smart_capture_widget_description">Dicta una tarea o hábito y deja que Trazo lo configure</string>
+    <string name="smart_capture_widget_name">Trazo · Capturar</string>
     <string name="smart_capture_widget_title">Captura inteligente</string>
     <string name="smart_capture_widget_example">“Spinning lun · mie · vie”</string>
     <string name="smart_capture_widget_voice">Dictar y guardar con Trazo</string>

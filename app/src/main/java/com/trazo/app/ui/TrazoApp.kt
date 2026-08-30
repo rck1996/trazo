@@ -170,6 +170,7 @@ private enum class Composer { TASK, HABIT }
 fun TrazoApp(
     viewModel: TrazoViewModel,
     requestedSection: String? = null,
+    requestedCapture: Int = 0,
     onExportBackup: () -> Unit = {},
     onImportBackup: () -> Unit = {}
 ) {
@@ -267,6 +268,7 @@ fun TrazoApp(
                         viewModel = viewModel,
                         onSmartTask = { taskDraft = it; composer = Composer.TASK },
                         onSmartHabit = { habitDraft = it; composer = Composer.HABIT }
+                        , requestedCapture = requestedCapture
                     )
                     Section.TASKS -> TasksScreen(
                         activeTasks, padding, toggleTaskWithFeedback, toggleSubtaskWithFeedback, viewModel::deleteTask,
@@ -463,10 +465,12 @@ private fun TodayScreen(
     onExportBackup: () -> Unit, onImportBackup: () -> Unit,
     viewModel: TrazoViewModel,
     onSmartTask: (TaskInput) -> Unit,
-    onSmartHabit: (HabitInput) -> Unit
+    onSmartHabit: (HabitInput) -> Unit,
+    requestedCapture: Int = 0
 ) {
     var showSettings by remember { mutableStateOf(false) }
     var showCapture by remember { mutableStateOf(false) }
+    LaunchedEffect(requestedCapture) { if (requestedCapture > 0) showCapture = true }
     var weeklyReview by remember { mutableStateOf(false) }
     val today = LocalDate.now()
     val relevantTasks = TaskSchedule.actionable(tasks, today)

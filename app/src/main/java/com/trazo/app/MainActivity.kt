@@ -14,6 +14,7 @@ import com.trazo.app.widget.TrazoWidget
 
 class MainActivity : ComponentActivity() {
     private val requestedSection = mutableStateOf<String?>(null)
+    private val requestedCapture = mutableStateOf(0)
     private val appViewModel: TrazoViewModel by viewModels()
     private val exportBackup = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -45,12 +46,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedSection.value = intent.getStringExtra(EXTRA_SECTION)
+        if (intent.getBooleanExtra(EXTRA_CAPTURE, false)) requestedCapture.value++
         enableEdgeToEdge()
         setContent {
             TrazoTheme(appViewModel.settings.value) {
                 TrazoApp(
                     appViewModel,
                     requestedSection.value,
+                    requestedCapture.value,
                     onExportBackup = { exportBackup.launch("Trazo-copia.json") },
                     onImportBackup = { importBackup.launch(arrayOf("application/json", "text/plain")) }
                 )
@@ -68,7 +71,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         requestedSection.value = intent.getStringExtra(EXTRA_SECTION)
+        if (intent.getBooleanExtra(EXTRA_CAPTURE, false)) requestedCapture.value++
     }
 
-    companion object { const val EXTRA_SECTION = "open_section" }
+    companion object {
+        const val EXTRA_SECTION = "open_section"
+        const val EXTRA_CAPTURE = "open_capture"
+    }
 }

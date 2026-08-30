@@ -123,10 +123,7 @@ class TrazoWidget : AppWidgetProvider() {
 
         fun updateAll(context: Context) {
             updateSelf(context)
-            HabitWidget.updateAll(context)
             FocusWidget.updateAll(context)
-            TaskListWidget.updateAll(context)
-            HabitListWidget.updateAll(context)
         }
 
         fun updateSelf(context: Context) {

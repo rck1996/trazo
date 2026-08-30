@@ -71,6 +71,10 @@ class FocusWidget : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.focus_widget_idle_time, open)
                 setOnClickPendingIntent(R.id.focus_widget_action, toggleFocus(context, widgetId))
                 setTextViewText(R.id.focus_widget_phase, if (session?.phase == "BREAK") "DESCANSO" else "MODO ENFOQUE")
+                setImageViewResource(
+                    R.id.focus_widget_art,
+                    if (session?.phase == "BREAK") R.drawable.pomodoro_ai_cup else R.drawable.widget_tomato
+                )
                 setTextViewText(
                     R.id.focus_widget_task,
                     session?.taskTitle ?: nextTask?.title ?: "Un trazo a la vez"
@@ -79,14 +83,15 @@ class FocusWidget : AppWidgetProvider() {
                     setViewVisibility(R.id.focus_widget_timer, View.GONE)
                     setViewVisibility(R.id.focus_widget_idle_time, View.VISIBLE)
                     val minutes = nextTask?.durationMinutes?.coerceIn(1, 180) ?: 25
-                    setTextViewText(R.id.focus_widget_action, "▶  Iniciar $minutes min")
+                    setTextViewText(R.id.focus_widget_idle_time, "%02d:00".format(minutes))
+                    setTextViewText(R.id.focus_widget_action, "▶  $minutes min")
                 } else {
                     val base = SystemClock.elapsedRealtime() + (session.endAt - System.currentTimeMillis())
                     setViewVisibility(R.id.focus_widget_timer, View.VISIBLE)
                     setViewVisibility(R.id.focus_widget_idle_time, View.GONE)
                     setChronometer(R.id.focus_widget_timer, base, null, true)
                     setChronometerCountDown(R.id.focus_widget_timer, true)
-                    setTextViewText(R.id.focus_widget_action, "■  Detener")
+                    setTextViewText(R.id.focus_widget_action, "■  Parar")
                 }
             }
         }

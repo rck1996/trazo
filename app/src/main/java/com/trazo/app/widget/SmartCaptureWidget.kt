@@ -17,17 +17,20 @@ class SmartCaptureWidget : AppWidgetProvider() {
             val views = RemoteViews(context.packageName, R.layout.smart_capture_widget)
             views.setOnClickPendingIntent(
                 R.id.smart_capture_voice,
-                PendingIntent.getActivity(
-                    context, id,
-                    Intent(context, VoiceCaptureActivity::class.java),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+                PendingIntent.getActivity(context, id, Intent(context, VoiceCaptureActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
             views.setOnClickPendingIntent(
                 R.id.smart_capture_root,
+                PendingIntent.getActivity(context, id + 20_000, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
+            views.setOnClickPendingIntent(
+                R.id.smart_capture_text,
                 PendingIntent.getActivity(
-                    context, id + 20_000,
-                    Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                    context, id + 30_000,
+                    Intent(context, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        .putExtra(MainActivity.EXTRA_SECTION, "TODAY")
+                        .putExtra(MainActivity.EXTRA_CAPTURE, true),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
             )

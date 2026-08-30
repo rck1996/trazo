@@ -68,7 +68,12 @@ Los bloques se pueden reprogramar con precisión de 15 minutos y las tareas sin 
 - Alarmas puntuales incluso con la app cerrada, recuperación tras reinicio y acciones `Hecho`, `+10 min` y `+30 min`.
 - Diagnóstico de permisos, próximo aviso, último envío y prueba audible del modo elegido.
 - Resumen matinal, cierre nocturno configurable y estadísticas semanales de tareas, hábitos y Pomodoro.
-- Seis widgets interactivos: resumen diario, hábito rápido, temporizador, próximas tareas, jardín de rituales y captura inteligente.
+- Tres widgets con funciones bien diferenciadas: panel diario detallado, Pomodoro compacto 2×1 y captura inteligente por texto o voz.
+
+<p align="center">
+  <img src="artifacts/Trazo-3.9.0-three-widgets-expanded.png" width="42%" alt="Selector de Android con los tres widgets de Trazo" />
+  <img src="artifacts/Trazo-3.9.0-capture-from-widget.png" width="29%" alt="Captura escrita abierta directamente desde el widget" />
+</p>
 
 ### Apariencia y accesibilidad
 

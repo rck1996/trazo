@@ -41,6 +41,7 @@
         <receiver android:name=".notifications.ItemReminderReceiver" android:exported="false" />
         <receiver
             android:name=".widget.TrazoWidget"
+            android:label="@string/widget_detailed_name"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -50,17 +51,8 @@
                 android:resource="@xml/trazo_widget_info" />
         </receiver>
         <receiver
-            android:name=".widget.HabitWidget"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/habit_widget_info" />
-        </receiver>
-        <receiver
             android:name=".widget.FocusWidget"
+            android:label="@string/focus_widget_name"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -70,27 +62,8 @@
                 android:resource="@xml/focus_widget_info" />
         </receiver>
         <receiver
-            android:name=".widget.TaskListWidget"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/task_list_widget_info" />
-        </receiver>
-        <receiver
-            android:name=".widget.HabitListWidget"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/habit_list_widget_info" />
-        </receiver>
-        <receiver
             android:name=".widget.SmartCaptureWidget"
+            android:label="@string/smart_capture_widget_name"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
